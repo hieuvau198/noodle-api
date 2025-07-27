@@ -30,7 +30,6 @@ namespace UserService.Domain.Repositories
         public async Task<User?> GetByIdAsync(int id)
         {
             return await _context.Users
-                .Include(u => u.Orders)
                 .FirstOrDefaultAsync(u => u.UserId == id);
         }
 

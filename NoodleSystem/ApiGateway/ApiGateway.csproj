@@ -14,4 +14,8 @@
     <Folder Include="Controllers\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\NoodleSystem.ServiceDefaults\NoodleSystem.ServiceDefaults.csproj" />
+  </ItemGroup>
+
 </Project>

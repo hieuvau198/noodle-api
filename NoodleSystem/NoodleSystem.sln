@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.12.35527.113 d17.12
+VisualStudioVersion = 17.12.35527.113
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApiGateway", "ApiGateway\ApiGateway.csproj", "{53E6F27D-8F02-4A07-B246-05971D234930}"
 EndProject
@@ -10,6 +10,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrderService", "OrderService\OrderService.csproj", "{66585243-1D9B-4539-B2E4-B4C47DA4D961}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaymentService", "PaymentService\PaymentService.csproj", "{7982405B-CD1C-40FE-B835-F7CAACDA4C24}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NoodleSystem.AppHost", "NoodleSystem.AppHost\NoodleSystem.AppHost.csproj", "{F7814C4E-2DB4-44B7-A5B2-BEAF43530A8C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NoodleSystem.ServiceDefaults", "NoodleSystem.ServiceDefaults\NoodleSystem.ServiceDefaults.csproj", "{511443EF-89F4-701C-011F-3989AF070070}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +37,14 @@ Global
 		{7982405B-CD1C-40FE-B835-F7CAACDA4C24}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7982405B-CD1C-40FE-B835-F7CAACDA4C24}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7982405B-CD1C-40FE-B835-F7CAACDA4C24}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F7814C4E-2DB4-44B7-A5B2-BEAF43530A8C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F7814C4E-2DB4-44B7-A5B2-BEAF43530A8C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F7814C4E-2DB4-44B7-A5B2-BEAF43530A8C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F7814C4E-2DB4-44B7-A5B2-BEAF43530A8C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{511443EF-89F4-701C-011F-3989AF070070}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{511443EF-89F4-701C-011F-3989AF070070}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{511443EF-89F4-701C-011F-3989AF070070}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{511443EF-89F4-701C-011F-3989AF070070}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

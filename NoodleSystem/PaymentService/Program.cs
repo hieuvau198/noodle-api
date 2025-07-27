@@ -1,9 +1,18 @@
+using Microsoft.EntityFrameworkCore;
+using PaymentService.Domain;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Add Aspire service defaults
+builder.AddServiceDefaults();
 
+// Add SQL Server DbContext using Aspire
+builder.AddSqlServerDbContext<PaymentDbContext>("spicyNoodleDbPayment");
+
+// Add services to the container.
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
+// Add Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -21,5 +30,8 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Add Aspire default endpoints
+app.MapDefaultEndpoints();
 
 app.Run();

@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace UserService.Domain.Entities;
 
 public partial class User
 {
+    [Key]
     public int UserId { get; set; }
 
     public string FullName { get; set; } = null!;
@@ -24,6 +26,4 @@ public partial class User
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
-
-    public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 }
