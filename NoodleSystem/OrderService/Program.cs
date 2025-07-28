@@ -14,6 +14,34 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// Ensure database is created and seeded
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
+    context.Database.EnsureCreated();
+    
+    // Add seed data if tables are empty
+    if (!context.SpicyNoodles.Any())
+    {
+        context.SpicyNoodles.AddRange(
+            new SpicyNoodle { Name = "Classic Spicy Ramen", BasePrice = 8.99m, Description = "Traditional spicy ramen with rich broth and tender noodles" },
+            new SpicyNoodle { Name = "Korean Fire Noodles", BasePrice = 9.99m, Description = "Extremely spicy Korean-style instant noodles" },
+            new SpicyNoodle { Name = "Thai Tom Yum Noodles", BasePrice = 10.49m, Description = "Aromatic Thai soup noodles with lemongrass and chili" }
+        );
+        context.SaveChanges();
+    }
+    
+    if (!context.Orders.Any())
+    {
+        context.Orders.AddRange(
+            new Order { UserId = 1, Status = "Completed", TotalAmount = 15.49m },
+            new Order { UserId = 2, Status = "Completed", TotalAmount = 22.98m },
+            new Order { UserId = 3, Status = "Pending", TotalAmount = 18.99m }
+        );
+        context.SaveChanges();
+    }
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

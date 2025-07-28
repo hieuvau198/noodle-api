@@ -1,6 +1,6 @@
 ﻿namespace OrderService.Application.Services
 {
-    public class OrderService
+    public class OrderBusinessService
     {
     }
 }

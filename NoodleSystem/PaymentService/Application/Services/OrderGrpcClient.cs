@@ -1,5 +1,6 @@
 using Grpc.Net.Client;
 using OrderService.Grpc;
+using System.Net.Http;
 
 namespace PaymentService.Application.Services;
 
@@ -11,17 +12,23 @@ public interface IOrderGrpcClient
 
 public class OrderGrpcClient : IOrderGrpcClient
 {
-    private readonly GrpcChannel _channel;
+    private readonly HttpClient _httpClient;
     private readonly OrderService.Grpc.OrderService.OrderServiceClient _client;
     private readonly ILogger<OrderGrpcClient> _logger;
 
-    public OrderGrpcClient(ILogger<OrderGrpcClient> logger)
+    public OrderGrpcClient(HttpClient httpClient, ILogger<OrderGrpcClient> logger)
     {
-        var orderServiceUrl = Environment.GetEnvironmentVariable("ORDER_SERVICE_URL") ?? "https://localhost:7001";
-        
-        _channel = GrpcChannel.ForAddress(orderServiceUrl);
-        _client = new OrderService.Grpc.OrderService.OrderServiceClient(_channel);
+        _httpClient = httpClient;
         _logger = logger;
+        
+        var channel = GrpcChannel.ForAddress(_httpClient.BaseAddress!, new GrpcChannelOptions
+        {
+            HttpClient = _httpClient
+        });
+        
+        _client = new OrderService.Grpc.OrderService.OrderServiceClient(channel);
+        
+        _logger.LogInformation("OrderGrpcClient initialized with base address: {BaseAddress}", _httpClient.BaseAddress);
     }
 
     public async Task<bool> ValidateOrderExistsAsync(int orderId)
