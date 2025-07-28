@@ -13,6 +13,12 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.4" />
     <PackageReference Include="Aspire.Microsoft.Data.SqlClient" Version="8.0.0" />
     <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.60.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.25.1" />
+    <PackageReference Include="Grpc.Tools" Version="2.60.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -20,7 +26,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Protobuf Include="Protos\order.proto" GrpcServices="Client" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Controllers\" />
+    <Folder Include="Protos\" />
   </ItemGroup>
 
 </Project>

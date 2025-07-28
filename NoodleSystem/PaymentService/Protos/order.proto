@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+option csharp_namespace = "OrderService.Grpc";
+
+package order;
+
+// The order service definition
+service OrderService {
+  // Validates if an order exists
+  rpc ValidateOrder (ValidateOrderRequest) returns (ValidateOrderResponse);
+}
+
+// The request message containing the order ID
+message ValidateOrderRequest {
+  int32 orderId = 1;
+}
+
+// The response message containing validation result
+message ValidateOrderResponse {
+  bool exists = 1;
+  string message = 2;
+  OrderDetails order = 3;
+}
+
+// Order details
+message OrderDetails {
+  int32 orderId = 1;
+  int32 userId = 2;
+  string status = 3;
+  double totalAmount = 4;
+  string createdAt = 5;
+  string updatedAt = 6;
+} 

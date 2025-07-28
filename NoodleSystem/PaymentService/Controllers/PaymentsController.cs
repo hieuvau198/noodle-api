@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PaymentService.Domain;
+using PaymentService.Application.Services;
 
 namespace PaymentService.Controllers;
 
@@ -10,14 +11,18 @@ public class PaymentsController : ControllerBase
 {
     private readonly PaymentDbContext _context;
     private readonly ILogger<PaymentsController> _logger;
+    private readonly IOrderGrpcClient _orderGrpcClient;
 
-    public PaymentsController(PaymentDbContext context, ILogger<PaymentsController> logger)
+    public PaymentsController(
+        PaymentDbContext context, 
+        ILogger<PaymentsController> logger,
+        IOrderGrpcClient orderGrpcClient)
     {
         _context = context;
         _logger = logger;
+        _orderGrpcClient = orderGrpcClient;
     }
 
-    // GET: api/payments/test
     [HttpGet("test")]
     public async Task<IActionResult> TestConnection()
     {
@@ -41,7 +46,6 @@ public class PaymentsController : ControllerBase
         }
     }
 
-    // GET: api/payments
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Payment>>> GetPayments()
     {
@@ -70,7 +74,6 @@ public class PaymentsController : ControllerBase
         }
     }
 
-    // GET: api/payments/{id}
     [HttpGet("{id}")]
     public async Task<ActionResult<Payment>> GetPayment(int id)
     {
@@ -105,7 +108,6 @@ public class PaymentsController : ControllerBase
         }
     }
 
-    // GET: api/payments/order/{orderId}
     [HttpGet("order/{orderId}")]
     public async Task<ActionResult<IEnumerable<Payment>>> GetPaymentsByOrder(int orderId)
     {
@@ -135,12 +137,24 @@ public class PaymentsController : ControllerBase
         }
     }
 
-    // POST: api/payments
     [HttpPost]
     public async Task<ActionResult<Payment>> CreatePayment([FromBody] CreatePaymentRequest request)
     {
         try
         {
+            var orderExists = await _orderGrpcClient.ValidateOrderExistsAsync(request.OrderId);
+            if (!orderExists)
+            {
+                _logger.LogWarning("Attempted to create payment for non-existent order {OrderId}", request.OrderId);
+                return BadRequest(new { message = $"Order with ID {request.OrderId} does not exist" });
+            }
+
+            var orderDetails = await _orderGrpcClient.GetOrderDetailsAsync(request.OrderId);
+            if (orderDetails is not null)
+            {
+                _logger.LogInformation("Creating payment for order {OrderId} with amount {Amount}", request.OrderId, request.Amount);
+            }
+
             var payment = new Payment
             {
                 OrderId = request.OrderId,
@@ -155,6 +169,8 @@ public class PaymentsController : ControllerBase
             _context.Payments.Add(payment);
             await _context.SaveChangesAsync();
 
+            _logger.LogInformation("Payment created successfully with ID {PaymentId} for order {OrderId}", payment.PaymentId, request.OrderId);
+
             return CreatedAtAction(nameof(GetPayment), new { id = payment.PaymentId }, new
             {
                 payment.PaymentId,
@@ -167,14 +183,18 @@ public class PaymentsController : ControllerBase
                 payment.CreatedAt
             });
         }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "Order validation failed for order {OrderId}", request.OrderId);
+            return StatusCode(503, new { message = "Order service unavailable", error = ex.Message });
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating payment");
+            _logger.LogError(ex, "Error creating payment for order {OrderId}", request.OrderId);
             return StatusCode(500, new { message = "Error creating payment", error = ex.Message });
         }
     }
 
-    // PUT: api/payments/{id}/status
     [HttpPut("{id}/status")]
     public async Task<ActionResult> UpdatePaymentStatus(int id, [FromBody] UpdatePaymentStatusRequest request)
     {

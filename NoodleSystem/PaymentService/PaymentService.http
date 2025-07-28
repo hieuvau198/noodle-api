@@ -1,6 +1,31 @@
-@PaymentService_HostAddress = http://localhost:5227
+### Test Payment Service Connection
+GET https://localhost:7002/api/payments/test
 
-GET {{PaymentService_HostAddress}}/weatherforecast/
-Accept: application/json
+### Get All Payments
+GET https://localhost:7002/api/payments
 
-###
+### Get Payment by ID
+GET https://localhost:7002/api/payments/1
+
+### Get Payments by Order ID
+GET https://localhost:7002/api/payments/order/1
+
+### Create Payment (requires existing order)
+POST https://localhost:7002/api/payments
+Content-Type: application/json
+
+{
+  "orderId": 1,
+  "amount": 25.99,
+  "status": "Pending",
+  "paymentMethod": "Credit Card",
+  "transactionId": "txn_123456789"
+}
+
+### Update Payment Status
+PUT https://localhost:7002/api/payments/1/status
+Content-Type: application/json
+
+{
+  "status": "Completed"
+}

@@ -1,24 +1,19 @@
 using Microsoft.EntityFrameworkCore;
 using OrderService.Domain;
+using OrderService.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Aspire service defaults
 builder.AddServiceDefaults();
-
-// Add SQL Server DbContext using Aspire
 builder.AddSqlServerDbContext<OrderDbContext>("spicyNoodleDbOrder");
 
-// Add services to the container.
 builder.Services.AddControllers();
-
-// Add Swagger
+builder.Services.AddGrpc();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -26,12 +21,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
-// Add Aspire default endpoints
+app.MapGrpcService<OrderGrpcService>();
 app.MapDefaultEndpoints();
 
 app.Run();

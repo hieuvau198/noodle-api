@@ -18,7 +18,6 @@ public class UsersController : ControllerBase
         _logger = logger;
     }
 
-    // GET: api/users/test
     [HttpGet("test")]
     public async Task<IActionResult> TestConnection()
     {
@@ -42,7 +41,6 @@ public class UsersController : ControllerBase
         }
     }
 
-    // GET: api/users
     [HttpGet]
     public async Task<ActionResult<IEnumerable<User>>> GetUsers()
     {
@@ -70,7 +68,6 @@ public class UsersController : ControllerBase
         }
     }
 
-    // GET: api/users/{id}
     [HttpGet("{id}")]
     public async Task<ActionResult<User>> GetUser(int id)
     {
@@ -103,7 +100,6 @@ public class UsersController : ControllerBase
         }
     }
 
-    // POST: api/users
     [HttpPost]
     public async Task<ActionResult<User>> CreateUser([FromBody] CreateUserRequest request)
     {
@@ -118,7 +114,7 @@ public class UsersController : ControllerBase
             {
                 FullName = request.FullName,
                 Email = request.Email,
-                Password = request.Password, // In production, this should be hashed
+                Password = request.Password,
                 GoogleId = request.GoogleId,
                 Role = request.Role,
                 IsGoogleUser = !string.IsNullOrEmpty(request.GoogleId),
@@ -154,5 +150,5 @@ public class CreateUserRequest
     public string Email { get; set; } = string.Empty;
     public string? Password { get; set; }
     public string? GoogleId { get; set; }
-    public int Role { get; set; } = 2; // Default to Customer
+    public int Role { get; set; } = 2;
 }

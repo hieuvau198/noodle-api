@@ -17,7 +17,6 @@ public class OrdersController : ControllerBase
         _logger = logger;
     }
 
-    // GET: api/orders/test
     [HttpGet("test")]
     public async Task<IActionResult> TestConnection()
     {
@@ -43,7 +42,6 @@ public class OrdersController : ControllerBase
         }
     }
 
-    // GET: api/orders
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
     {
@@ -72,7 +70,6 @@ public class OrdersController : ControllerBase
         }
     }
 
-    // GET: api/orders/{id}
     [HttpGet("{id}")]
     public async Task<ActionResult<Order>> GetOrder(int id)
     {
@@ -122,7 +119,6 @@ public class OrdersController : ControllerBase
         }
     }
 
-    // GET: api/orders/user/{userId}
     [HttpGet("user/{userId}")]
     public async Task<ActionResult<IEnumerable<Order>>> GetOrdersByUser(int userId)
     {
@@ -152,7 +148,6 @@ public class OrdersController : ControllerBase
         }
     }
 
-    // GET: api/orders/noodles
     [HttpGet("noodles")]
     public async Task<ActionResult<IEnumerable<SpicyNoodle>>> GetNoodles()
     {
@@ -180,7 +175,6 @@ public class OrdersController : ControllerBase
         }
     }
 
-    // POST: api/orders
     [HttpPost]
     public async Task<ActionResult<Order>> CreateOrder([FromBody] CreateOrderRequest request)
     {
@@ -190,7 +184,7 @@ public class OrdersController : ControllerBase
             {
                 UserId = request.UserId,
                 Status = "Pending",
-                TotalAmount = 0, // Will be calculated from items
+                TotalAmount = 0,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -198,7 +192,6 @@ public class OrdersController : ControllerBase
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
-            // Add order items if provided
             if (request.Items != null && request.Items.Any())
             {
                 foreach (var item in request.Items)
@@ -223,7 +216,6 @@ public class OrdersController : ControllerBase
 
                 await _context.SaveChangesAsync();
 
-                // Recalculate total
                 order.TotalAmount = await _context.OrderItems
                     .Where(oi => oi.OrderId == order.OrderId)
                     .SumAsync(oi => oi.Subtotal);
@@ -249,7 +241,6 @@ public class OrdersController : ControllerBase
         }
     }
 
-    // PUT: api/orders/{id}/status
     [HttpPut("{id}/status")]
     public async Task<ActionResult> UpdateOrderStatus(int id, [FromBody] UpdateOrderStatusRequest request)
     {

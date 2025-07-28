@@ -1,24 +1,19 @@
 using Microsoft.EntityFrameworkCore;
 using PaymentService.Domain;
+using PaymentService.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Aspire service defaults
 builder.AddServiceDefaults();
-
-// Add SQL Server DbContext using Aspire
 builder.AddSqlServerDbContext<PaymentDbContext>("spicyNoodleDbPayment");
 
-// Add services to the container.
 builder.Services.AddControllers();
-
-// Add Swagger
+builder.Services.AddSingleton<IOrderGrpcClient, OrderGrpcClient>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -26,12 +21,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
-// Add Aspire default endpoints
 app.MapDefaultEndpoints();
 
 app.Run();
