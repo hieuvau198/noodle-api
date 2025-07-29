@@ -1,6 +1,7 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 var cache = builder.AddRedis("cache");
+var rabbitmq = builder.AddRabbitMQ("rabbitmq");
 
 var password = builder.AddParameter("password", secret: true);
 var sql = builder.AddSqlServer("sql", password);
@@ -264,9 +265,11 @@ var creationScriptOrder = $$"""
 var spicyNoodleDbUser = sql.AddDatabase(databaseNameUser)
     .WithCreationScript(creationScriptUser);
 
-var spicyNoodleDbPayment = sql.AddDatabase(databaseNamePayment);
+var spicyNoodleDbPayment = sql.AddDatabase(databaseNamePayment)
+    .WithCreationScript(creationScriptPayment);
 
-var spicyNoodleDbOrder = sql.AddDatabase(databaseNameOrder);
+var spicyNoodleDbOrder = sql.AddDatabase(databaseNameOrder)
+    .WithCreationScript(creationScriptOrder);
 
 
 
@@ -278,12 +281,16 @@ builder.AddProject<Projects.UserService>("user-service")
 
 var orderService = builder.AddProject<Projects.OrderService>("order-service")
     .WithReference(spicyNoodleDbOrder)
-    .WaitFor(spicyNoodleDbOrder);
+    .WithReference(rabbitmq)
+    .WaitFor(spicyNoodleDbOrder)
+    .WaitFor(rabbitmq);
 
 builder.AddProject<Projects.PaymentService>("payment-service")
     .WithReference(spicyNoodleDbPayment)
     .WithReference(orderService)
-    .WaitFor(spicyNoodleDbPayment);
+    .WithReference(rabbitmq)
+    .WaitFor(spicyNoodleDbPayment)
+    .WaitFor(rabbitmq);
 
 
 builder.Build().Run();

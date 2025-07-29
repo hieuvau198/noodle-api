@@ -1,12 +1,44 @@
 using Microsoft.EntityFrameworkCore;
 using OrderService.Domain;
+using OrderService.Domain.Repositories;
 using OrderService.Application.Services;
+using OrderService.Application.Handlers;
+using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddSqlServerDbContext<OrderDbContext>("spicyNoodleDbOrder");
 
+// Add RabbitMQ with Aspire
+builder.AddRabbitMQClient("rabbitmq");
+
+// Configure MassTransit
+builder.Services.AddMassTransit(x =>
+{
+    // Add consumers
+    x.AddConsumer<OrderCreatedEventHandler>();
+    x.AddConsumer<PaymentRequestedEventHandler>();
+    x.AddConsumer<PaymentCompletedEventHandler>();
+    x.AddConsumer<PaymentFailedEventHandler>();
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        var connectionString = builder.Configuration.GetConnectionString("rabbitmq");
+        cfg.Host(connectionString);
+        
+        cfg.ConfigureEndpoints(context);
+    });
+});
+
+// Register repositories and services
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IOrderService, OrderService.Application.Services.OrderService>();
+
+// Register new application services
+builder.Services.AddHttpClient<IPaymentServiceClient, PaymentServiceClient>();
+
+// Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddGrpc();
 builder.Services.AddEndpointsApiExplorer();

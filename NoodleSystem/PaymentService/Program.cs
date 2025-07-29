@@ -1,11 +1,31 @@
 using Microsoft.EntityFrameworkCore;
 using PaymentService.Domain;
 using PaymentService.Application.Services;
+using PaymentService.Application.Handlers;
+using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddSqlServerDbContext<PaymentDbContext>("spicyNoodleDbPayment");
+
+// Add RabbitMQ with Aspire
+builder.AddRabbitMQClient("rabbitmq");
+
+// Configure MassTransit
+builder.Services.AddMassTransit(x =>
+{
+    // Add consumers
+    x.AddConsumer<PaymentRequestedEventHandler>();
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        var connectionString = builder.Configuration.GetConnectionString("rabbitmq");
+        cfg.Host(connectionString);
+        
+        cfg.ConfigureEndpoints(context);
+    });
+});
 
 // Add HttpClient for OrderService
 builder.Services.AddHttpClient<IOrderGrpcClient, OrderGrpcClient>(client =>

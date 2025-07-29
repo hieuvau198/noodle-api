@@ -5,7 +5,7 @@ using OrderService.Grpc;
 
 namespace OrderService.Application.Services;
 
-public class OrderGrpcService : OrderService.Grpc.OrderService.OrderServiceBase
+public class OrderGrpcService : Grpc.OrderService.OrderServiceBase
 {
     private readonly OrderDbContext _context;
     private readonly ILogger<OrderGrpcService> _logger;
