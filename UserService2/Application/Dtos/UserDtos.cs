@@ -36,4 +36,17 @@
         public int Role { get; set; }
         public bool IsGoogleUser { get; set; }
     }
+
+    public class GoogleAuthRequest
+    {
+        public string IdToken { get; set; } = null!;
+    }
+
+    public class GoogleUserInfo
+    {
+        public string Id { get; set; } = null!;
+        public string Email { get; set; } = null!;
+        public string Name { get; set; } = null!;
+        public string? Picture { get; set; }
+    }
 }

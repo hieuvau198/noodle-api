@@ -3,6 +3,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using UserService2.Application.Dtos;
 using UserService2.Domain.Entities;
 using UserService2.Domain.Repositories;
@@ -13,6 +14,7 @@ namespace UserService2.Application.Services
     {
         Task<AuthResult> LoginAsync(Dtos.LoginRequest request);
         Task<AuthResult> RegisterAsync(Dtos.RegisterRequest request);
+        Task<AuthResult> GoogleLoginAsync(GoogleAuthRequest request);
         Task<bool> ForgotPasswordAsync(string email);
         Task<User?> GetUserByIdAsync(int id);
         Task<IEnumerable<User>> GetAllUsersAsync();
@@ -165,6 +167,152 @@ namespace UserService2.Application.Services
 
             await _userRepository.DeleteAsync(id);
             return true;
+        }
+
+        public async Task<AuthResult> GoogleLoginAsync(GoogleAuthRequest request)
+        {
+            try
+            {
+                // Verify Google ID token
+                var googleUserInfo = await VerifyGoogleIdTokenAsync(request.IdToken);
+                if (googleUserInfo == null)
+                {
+                    return new AuthResult { Success = false, Message = "Invalid Google token" };
+                }
+
+                // Check if user exists
+                var existingUser = await _userRepository.GetByEmailAsync(googleUserInfo.Email);
+                
+                if (existingUser != null)
+                {
+                    // User exists - allow both password and Google login
+                    // Update Google ID if needed
+                    if (string.IsNullOrEmpty(existingUser.GoogleId))
+                    {
+                        existingUser.GoogleId = googleUserInfo.Id;
+                        existingUser.IsGoogleUser = true; // Mark as Google user
+                        await _userRepository.UpdateAsync(existingUser);
+                    }
+
+                    var token = GenerateJwtToken(existingUser);
+                    return new AuthResult
+                    {
+                        Success = true,
+                        Token = token,
+                        User = new UserDto
+                        {
+                            UserId = existingUser.UserId,
+                            FullName = existingUser.FullName,
+                            Email = existingUser.Email,
+                            Role = existingUser.Role,
+                            IsGoogleUser = existingUser.IsGoogleUser
+                        }
+                    };
+                }
+                else
+                {
+                    // Create new Google user
+                    var newUser = new User
+                    {
+                        FullName = googleUserInfo.Name,
+                        Email = googleUserInfo.Email,
+                        GoogleId = googleUserInfo.Id,
+                        Role = 0, // Default role (customer)
+                        IsGoogleUser = true,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    var createdUser = await _userRepository.CreateAsync(newUser);
+                    var token = GenerateJwtToken(createdUser);
+
+                    return new AuthResult
+                    {
+                        Success = true,
+                        Token = token,
+                        User = new UserDto
+                        {
+                            UserId = createdUser.UserId,
+                            FullName = createdUser.FullName,
+                            Email = createdUser.Email,
+                            Role = createdUser.Role,
+                            IsGoogleUser = createdUser.IsGoogleUser
+                        }
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new AuthResult { Success = false, Message = "Google login failed" };
+            }
+        }
+
+        private async Task<GoogleUserInfo?> VerifyGoogleIdTokenAsync(string idToken)
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                
+                // Verify token with Google
+                var response = await httpClient.GetAsync($"https://oauth2.googleapis.com/tokeninfo?id_token={idToken}");
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+                var tokenInfo = JsonSerializer.Deserialize<JsonElement>(content);
+
+                // Verify audience (client ID)
+                var audience = tokenInfo.GetProperty("aud").GetString();
+                var clientId = _configuration["Authentication:Google:ClientId"];
+                
+                if (audience != clientId)
+                {
+                    return null;
+                }
+
+                // Verify token expiration
+                if (tokenInfo.TryGetProperty("exp", out var exp))
+                {
+                    // Handle both string and number formats
+                    long expValue;
+                    if (exp.ValueKind == JsonValueKind.String)
+                    {
+                        expValue = long.Parse(exp.GetString()!);
+                    }
+                    else
+                    {
+                        expValue = exp.GetInt64();
+                    }
+                    
+                    var expirationTime = DateTimeOffset.FromUnixTimeSeconds(expValue);
+                    if (expirationTime < DateTimeOffset.UtcNow)
+                    {
+                        return null;
+                    }
+                }
+
+                // Extract user info
+                var sub = tokenInfo.GetProperty("sub").GetString() ?? "";
+                var email = tokenInfo.GetProperty("email").GetString() ?? "";
+                var name = tokenInfo.GetProperty("name").GetString() ?? "";
+                var picture = tokenInfo.TryGetProperty("picture", out var pictureElement) ? pictureElement.GetString() : null;
+
+                return new GoogleUserInfo
+                {
+                    Id = sub,
+                    Email = email,
+                    Name = name,
+                    Picture = picture
+                };
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
         }
 
         private string GenerateJwtToken(User user)

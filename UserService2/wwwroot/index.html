@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Sign-In Test</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .google-signin {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .token-display {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Google Sign-In Test</h1>
+        <p>Trang này giúp bạn test chức năng đăng nhập Google và lấy ID Token để test API.</p>
+        
+        <div class="google-signin">
+            <div id="g_id_onload"
+                 data-client_id="722513613922-bg3hiaoodn6djo3obiqqgk1fchi9ga0r.apps.googleusercontent.com"
+                 data-callback="handleCredentialResponse"
+                 data-auto_prompt="false">
+            </div>
+            <div class="g_id_signin" 
+                 data-type="standard" 
+                 data-size="large" 
+                 data-theme="outline" 
+                 data-text="sign_in_with" 
+                 data-shape="rectangular" 
+                 data-logo_alignment="left">
+            </div>
+        </div>
+
+        <div id="result" class="result" style="display: none;"></div>
+        
+        <div id="tokenSection" style="display: none;">
+            <h3>📋 Google ID Token:</h3>
+            <div id="tokenDisplay" class="token-display"></div>
+            
+            <h3>🚀 Test API:</h3>
+            <button onclick="testGoogleLogin()">Test Google Login API</button>
+            <button onclick="testTokenVerification()">Test Token Verification</button>
+            <button onclick="copyToken()">Copy Token</button>
+        </div>
+
+        <div class="info">
+            <h3>📝 Hướng dẫn sử dụng:</h3>
+            <ol>
+                <li>Click nút "Sign in with Google" ở trên</li>
+                <li>Chọn tài khoản Google của bạn</li>
+                <li>ID Token sẽ hiển thị bên dưới</li>
+                <li>Click "Test Google Login API" để test với backend</li>
+                <li>Hoặc copy token để test trong Postman/VS Code</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function handleCredentialResponse(response) {
+            console.log("Google Sign-In Response:", response);
+            
+            // Hiển thị token
+            document.getElementById('tokenDisplay').textContent = response.credential;
+            document.getElementById('tokenSection').style.display = 'block';
+            
+            // Hiển thị thông tin
+            showResult('✅ Đăng nhập Google thành công!\n\nID Token đã được lấy. Bạn có thể:\n1. Copy token để test trong Postman\n2. Click "Test Google Login API" để test trực tiếp\n3. Click "Test Token Verification" để debug', 'success');
+            
+            // Tự động test API
+            setTimeout(() => {
+                testGoogleLogin();
+            }, 1000);
+        }
+
+        function testGoogleLogin() {
+            const token = document.getElementById('tokenDisplay').textContent;
+            if (!token) {
+                showResult('❌ Chưa có ID Token. Vui lòng đăng nhập Google trước.', 'error');
+                return;
+            }
+
+            showResult('🔄 Đang test API...', 'info');
+
+            fetch('/api/auth/google-login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    idToken: token
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showResult(`✅ API Test thành công!\n\nToken: ${data.token}\nUser: ${JSON.stringify(data.user, null, 2)}`, 'success');
+                } else {
+                    showResult(`❌ API Test thất bại: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                showResult(`❌ Lỗi kết nối: ${error.message}`, 'error');
+            });
+        }
+
+        function copyToken() {
+            const token = document.getElementById('tokenDisplay').textContent;
+            navigator.clipboard.writeText(token).then(() => {
+                showResult('📋 Token đã được copy vào clipboard!', 'success');
+            }).catch(() => {
+                showResult('❌ Không thể copy token', 'error');
+            });
+        }
+
+        function testTokenVerification() {
+            const token = document.getElementById('tokenDisplay').textContent;
+            if (!token) {
+                showResult('❌ Chưa có ID Token. Vui lòng đăng nhập Google trước.', 'error');
+                return;
+            }
+
+            showResult('🔄 Đang test token verification...', 'info');
+
+            fetch('/api/auth/test-google-token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    idToken: token
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showResult(`🔍 Token Verification Result:\n\nStatus: ${data.statusCode}\nSuccess: ${data.isSuccess}\nClient ID: ${data.clientId}\n\nContent: ${data.content}`, 'info');
+            })
+            .catch(error => {
+                showResult(`❌ Lỗi test: ${error.message}`, 'error');
+            });
+        }
+
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = `result ${type}`;
+            resultDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html> 
