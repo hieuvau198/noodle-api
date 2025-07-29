@@ -36,8 +36,11 @@ builder.Services.AddAuthentication(options =>
 })
 .AddGoogle(options =>
 {
-    options.ClientId = builder.Configuration["Authentication:Google:ClientId"];
-    options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+    var clientIdBase64 = builder.Configuration["Authentication:Google:ClientId"];
+    var clientSecretBase64 = builder.Configuration["Authentication:Google:ClientSecret"];
+    
+    options.ClientId = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(clientIdBase64));
+    options.ClientSecret = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(clientSecretBase64));
     options.CallbackPath = "/auth/google-callback";
 });
 

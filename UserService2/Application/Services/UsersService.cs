@@ -318,7 +318,8 @@ namespace UserService2.Application.Services
         private string GenerateJwtToken(User user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Secret"] ?? "SpicyNoodleSecretKey12345");
+            var secretBase64 = _configuration["Jwt:Secret"] ?? "U3BpY3lOb29kbGVTZWNyZXRLZXkxMjM0NTY3ODkwMTIzNDU2Nzg5MA==";
+            var key = Encoding.ASCII.GetBytes(Convert.FromBase64String(secretBase64));
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
