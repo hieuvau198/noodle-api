@@ -137,7 +137,6 @@ public class PaymentRequestedEventHandler : IConsumer<PaymentRequestedEvent>
                 UserId = paymentEvent.UserId,
                 Amount = paymentEvent.Amount,
                 Currency = paymentEvent.Currency,
-                Metadata = paymentEvent.Metadata,
                 RequestedAt = paymentEvent.RequestedAt
             };
 

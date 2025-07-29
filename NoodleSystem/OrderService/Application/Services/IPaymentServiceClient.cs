@@ -1,4 +1,5 @@
 using OrderService.Application.Events;
+using Grpc.Net.Client;
 
 namespace OrderService.Application.Services;
 
@@ -16,8 +17,7 @@ public record PaymentRequestDto
     public int UserId { get; init; }
     public decimal Amount { get; init; }
     public string Currency { get; init; } = "VND";
-    public Dictionary<string, object> Metadata { get; init; } = new();
-    public DateTime RequestedAt { get; init; }
+    public DateTime RequestedAt { get; init; } = DateTime.UtcNow;
 }
 
 public record PaymentRequestResult
@@ -25,13 +25,13 @@ public record PaymentRequestResult
     public bool Success { get; init; }
     public string? PaymentId { get; init; }
     public string? PaymentUrl { get; init; }
+    public DateTime? ExpiresAt { get; init; }
     public string? ErrorMessage { get; init; }
-    public DateTime ExpiresAt { get; init; }
 }
 
 public record PaymentStatus
 {
-    public string Status { get; init; } = string.Empty; // Pending, Completed, Failed, Cancelled
+    public string Status { get; init; } = "";
     public string? TransactionId { get; init; }
     public decimal? AmountPaid { get; init; }
     public DateTime? PaidAt { get; init; }
@@ -40,47 +40,55 @@ public record PaymentStatus
 
 public class PaymentServiceClient : IPaymentServiceClient
 {
-    private readonly ILogger<PaymentServiceClient> _logger;
     private readonly HttpClient _httpClient;
+    private readonly PaymentService.Grpc.PaymentService.PaymentServiceClient _grpcClient;
+    private readonly ILogger<PaymentServiceClient> _logger;
 
-    public PaymentServiceClient(ILogger<PaymentServiceClient> logger, HttpClient httpClient)
+    public PaymentServiceClient(HttpClient httpClient, ILogger<PaymentServiceClient> logger)
     {
-        _logger = logger;
         _httpClient = httpClient;
+        _logger = logger;
+        
+        var channel = GrpcChannel.ForAddress(_httpClient.BaseAddress!, new GrpcChannelOptions
+        {
+            HttpClient = _httpClient
+        });
+        
+        _grpcClient = new PaymentService.Grpc.PaymentService.PaymentServiceClient(channel);
+        
+        _logger.LogInformation("PaymentServiceClient initialized with base address: {BaseAddress}", _httpClient.BaseAddress);
     }
 
     public async Task<PaymentRequestResult> RequestPaymentAsync(PaymentRequestDto request)
     {
-        _logger.LogInformation("Requesting payment for order {OrderId}, amount {Amount}", 
+        _logger.LogInformation("Requesting payment for order {OrderId}, amount {Amount} via gRPC", 
             request.OrderId, request.Amount);
 
         try
         {
-            Console.WriteLine("=== PAYMENT REQUEST ===");
-            Console.WriteLine($"Order ID: {request.OrderId}");
-            Console.WriteLine($"User ID: {request.UserId}");
-            Console.WriteLine($"Amount: {request.Amount:C} {request.Currency}");
-            Console.WriteLine($"Requested At: {request.RequestedAt}");
-            Console.WriteLine("========================");
-            
-            await Task.Delay(100);
-            var paymentId = $"pay_{Guid.NewGuid():N}";
-            var paymentUrl = $"https://payment.example.com/pay/{request.OrderId}";
-            
-            Console.WriteLine($"Payment request created: {paymentId}");
-            Console.WriteLine($"Payment URL: {paymentUrl}");
-            
+            var grpcRequest = new PaymentService.Grpc.PaymentRequestDto
+            {
+                OrderId = request.OrderId,
+                UserId = request.UserId,
+                Amount = (double)request.Amount,
+                Currency = request.Currency,
+                RequestedAt = request.RequestedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            };
+
+            var grpcResponse = await _grpcClient.RequestPaymentAsync(grpcRequest);
+
             return new PaymentRequestResult
             {
-                Success = true,
-                PaymentId = paymentId,
-                PaymentUrl = paymentUrl,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(15)
+                Success = grpcResponse.Success,
+                PaymentId = grpcResponse.PaymentId,
+                PaymentUrl = grpcResponse.PaymentUrl,
+                ExpiresAt = string.IsNullOrEmpty(grpcResponse.ExpiresAt) ? null : DateTime.Parse(grpcResponse.ExpiresAt),
+                ErrorMessage = grpcResponse.ErrorMessage
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error requesting payment for order {OrderId}", request.OrderId);
+            _logger.LogError(ex, "Error requesting payment for order {OrderId} via gRPC", request.OrderId);
             return new PaymentRequestResult
             {
                 Success = false,
@@ -91,57 +99,42 @@ public class PaymentServiceClient : IPaymentServiceClient
 
     public async Task<PaymentStatus> GetPaymentStatusAsync(int orderId)
     {
-        _logger.LogInformation("Getting payment status for order {OrderId}", orderId);
+        _logger.LogInformation("Getting payment status for order {OrderId} via gRPC", orderId);
 
         try
         {
-            // Academic implementation: Console logging and mock status checking
-            Console.WriteLine("=== PAYMENT STATUS CHECK ===");
-            Console.WriteLine($"Order ID: {orderId}");
-            
-            await Task.Delay(50);
-            
-            // Simulate random payment status for demonstration
-            var random = new Random();
-            var statusOptions = new[] { "Pending", "Completed", "Failed" };
-            var status = statusOptions[random.Next(statusOptions.Length)];
-            
-            Console.WriteLine($"Payment Status: {status}");
-            
+            var grpcRequest = new PaymentService.Grpc.GetPaymentStatusRequest
+            {
+                OrderId = orderId
+            };
+
+            var grpcResponse = await _grpcClient.GetPaymentStatusAsync(grpcRequest);
+
             var result = new PaymentStatus
             {
-                Status = status
+                Status = grpcResponse.Status
             };
-            
-            // Add additional details based on status
-            switch (status)
+
+            if (!string.IsNullOrEmpty(grpcResponse.TransactionId))
             {
-                case "Completed":
-                    result = result with 
-                    { 
-                        TransactionId = $"txn_{Guid.NewGuid():N}",
-                        AmountPaid = 150000m, // Mock amount
-                        PaidAt = DateTime.UtcNow.AddMinutes(-5)
-                    };
-                    Console.WriteLine($"Transaction ID: {result.TransactionId}");
-                    Console.WriteLine($"Amount Paid: {result.AmountPaid:C}");
-                    Console.WriteLine($"Paid At: {result.PaidAt}");
-                    break;
-                case "Failed":
-                    result = result with { FailureReason = "Insufficient funds" };
-                    Console.WriteLine($"Failure Reason: {result.FailureReason}");
-                    break;
-                case "Pending":
-                    Console.WriteLine("Payment is still being processed");
-                    break;
+                result = result with 
+                { 
+                    TransactionId = grpcResponse.TransactionId,
+                    AmountPaid = (decimal)grpcResponse.AmountPaid,
+                    PaidAt = string.IsNullOrEmpty(grpcResponse.PaidAt) ? null : DateTime.Parse(grpcResponse.PaidAt)
+                };
             }
-            
-            Console.WriteLine("=============================");
+
+            if (!string.IsNullOrEmpty(grpcResponse.FailureReason))
+            {
+                result = result with { FailureReason = grpcResponse.FailureReason };
+            }
+
             return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting payment status for order {OrderId}", orderId);
+            _logger.LogError(ex, "Error getting payment status for order {OrderId} via gRPC", orderId);
             return new PaymentStatus
             {
                 Status = "Error",
@@ -152,53 +145,64 @@ public class PaymentServiceClient : IPaymentServiceClient
 
     public async Task<bool> CancelPaymentAsync(int orderId, string reason)
     {
-        _logger.LogInformation("Cancelling payment for order {OrderId}, reason: {Reason}", orderId, reason);
+        _logger.LogInformation("Cancelling payment for order {OrderId}, reason: {Reason} via gRPC", orderId, reason);
 
         try
         {
-            // Academic implementation: Console logging instead of HTTP call
-            Console.WriteLine("=== PAYMENT CANCELLATION ===");
-            Console.WriteLine($"Order ID: {orderId}");
-            Console.WriteLine($"Cancellation Reason: {reason}");
-            Console.WriteLine($"Cancelled At: {DateTime.UtcNow}");
-            Console.WriteLine("Payment has been successfully cancelled.");
-            Console.WriteLine("==============================");
+            var grpcRequest = new PaymentService.Grpc.CancelPaymentRequest
+            {
+                OrderId = orderId,
+                Reason = reason
+            };
+
+            var grpcResponse = await _grpcClient.CancelPaymentAsync(grpcRequest);
             
-            await Task.Delay(50);
-            return true; // Always succeed in academic implementation
+            if (!grpcResponse.Success)
+            {
+                _logger.LogWarning("Failed to cancel payment for order {OrderId}: {Message}", orderId, grpcResponse.Message);
+            }
+
+            return grpcResponse.Success;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error cancelling payment for order {OrderId}", orderId);
-            Console.WriteLine($"Failed to cancel payment for order {orderId}: {ex.Message}");
+            _logger.LogError(ex, "Error cancelling payment for order {OrderId} via gRPC", orderId);
             return false;
         }
     }
 
     public async Task<bool> RefundPaymentAsync(int orderId, decimal amount, string reason)
     {
-        _logger.LogInformation("Requesting refund for order {OrderId}, amount {Amount}, reason: {Reason}", 
+        _logger.LogInformation("Requesting refund for order {OrderId}, amount {Amount}, reason: {Reason} via gRPC", 
             orderId, amount, reason);
 
         try
         {
-            // Academic implementation: Console logging instead of HTTP call
-            Console.WriteLine("=== PAYMENT REFUND ===");
-            Console.WriteLine($"Order ID: {orderId}");
-            Console.WriteLine($"Refund Amount: {amount:C}");
-            Console.WriteLine($"Refund Reason: {reason}");
-            Console.WriteLine($"Processed At: {DateTime.UtcNow}");
-            Console.WriteLine($"Refund ID: rfnd_{Guid.NewGuid():N}");
-            Console.WriteLine("Refund has been successfully processed.");
-            Console.WriteLine("=======================");
+            var grpcRequest = new PaymentService.Grpc.RefundPaymentRequest
+            {
+                OrderId = orderId,
+                Amount = (double)amount,
+                Reason = reason
+            };
+
+            var grpcResponse = await _grpcClient.RefundPaymentAsync(grpcRequest);
             
-            await Task.Delay(100);
-            return true; // Always succeed in academic implementation
+            if (!grpcResponse.Success)
+            {
+                _logger.LogWarning("Failed to refund payment for order {OrderId}: {Message}", orderId, grpcResponse.Message);
+            }
+            
+            if (!string.IsNullOrEmpty(grpcResponse.RefundId))
+            {
+                _logger.LogInformation("Refund processed successfully for order {OrderId}, refund ID: {RefundId}", 
+                    orderId, grpcResponse.RefundId);
+            }
+
+            return grpcResponse.Success;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing refund for order {OrderId}", orderId);
-            Console.WriteLine($"Failed to process refund for order {orderId}: {ex.Message}");
+            _logger.LogError(ex, "Error processing refund for order {OrderId} via gRPC", orderId);
             return false;
         }
     }

@@ -14,6 +14,7 @@
     <PackageReference Include="Aspire.Microsoft.Data.SqlClient" Version="8.0.0" />
     <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.64.0" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.64.0" />
     <PackageReference Include="Google.Protobuf" Version="3.27.0" />
     <PackageReference Include="Grpc.Tools" Version="2.64.0">
       <PrivateAssets>all</PrivateAssets>
@@ -30,6 +31,7 @@
 
   <ItemGroup>
     <Protobuf Include="Protos\order.proto" GrpcServices="Server,Client" />
+    <Protobuf Include="Protos\payment.proto" GrpcServices="Client" />
   </ItemGroup>
 
   <ItemGroup>

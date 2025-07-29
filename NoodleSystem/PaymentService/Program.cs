@@ -30,10 +30,11 @@ builder.Services.AddMassTransit(x =>
 // Add HttpClient for OrderService
 builder.Services.AddHttpClient<IOrderGrpcClient, OrderGrpcClient>(client =>
 {
-    client.BaseAddress = new Uri("https://order-service");
+    client.BaseAddress = new Uri("https://localhost:7082");
 });
 
 builder.Services.AddControllers();
+builder.Services.AddGrpc();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -66,6 +67,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGrpcService<PaymentService.Application.Services.PaymentGrpcService>();
 app.MapDefaultEndpoints();
 
 app.Run();

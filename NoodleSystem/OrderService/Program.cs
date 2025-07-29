@@ -36,7 +36,10 @@ builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IOrderService, OrderService.Application.Services.OrderService>();
 
 // Register new application services
-builder.Services.AddHttpClient<IPaymentServiceClient, PaymentServiceClient>();
+builder.Services.AddHttpClient<IPaymentServiceClient, PaymentServiceClient>(client =>
+{
+    client.BaseAddress = new Uri("https://localhost:7204");
+});
 
 // Add services to the container.
 builder.Services.AddControllers();

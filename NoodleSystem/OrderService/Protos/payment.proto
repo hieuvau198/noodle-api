@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+option csharp_namespace = "PaymentService.Grpc";
+
+package payment;
+
+service PaymentService {
+  rpc RequestPayment (PaymentRequestDto) returns (PaymentRequestResult);
+  rpc GetPaymentStatus (GetPaymentStatusRequest) returns (PaymentStatusResponse);
+  rpc CancelPayment (CancelPaymentRequest) returns (CancelPaymentResponse);
+  rpc RefundPayment (RefundPaymentRequest) returns (RefundPaymentResponse);
+}
+
+message PaymentRequestDto {
+  int32 orderId = 1;
+  int32 userId = 2;
+  double amount = 3;
+  string currency = 4;
+  string requestedAt = 5;
+}
+
+message PaymentRequestResult {
+  bool success = 1;
+  string paymentId = 2;
+  string paymentUrl = 3;
+  string expiresAt = 4;
+  string errorMessage = 5;
+}
+
+message GetPaymentStatusRequest {
+  int32 orderId = 1;
+}
+
+message PaymentStatusResponse {
+  string status = 1;
+  string transactionId = 2;
+  double amountPaid = 3;
+  string paidAt = 4;
+  string failureReason = 5;
+}
+
+message CancelPaymentRequest {
+  int32 orderId = 1;
+  string reason = 2;
+}
+
+message CancelPaymentResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message RefundPaymentRequest {
+  int32 orderId = 1;
+  double amount = 2;
+  string reason = 3;
+}
+
+message RefundPaymentResponse {
+  bool success = 1;
+  string refundId = 2;
+  string message = 3;
+}
