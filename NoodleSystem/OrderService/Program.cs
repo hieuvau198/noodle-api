@@ -20,7 +20,6 @@ builder.Services.AddMassTransit(x =>
     x.AddConsumer<OrderCreatedEventHandler>();
     x.AddConsumer<PaymentRequestedEventHandler>();
     x.AddConsumer<PaymentCompletedEventHandler>();
-    x.AddConsumer<PaymentFailedEventHandler>();
 
     x.UsingRabbitMq((context, cfg) =>
     {

@@ -1,4 +1,5 @@
 using MassTransit;
+using OrderService.Grpc;
 using PaymentService.Application.Events;
 using PaymentService.Application.Services;
 using PaymentService.Domain;
@@ -65,21 +66,10 @@ public class PaymentRequestedEventHandler : IConsumer<PaymentRequestedEvent>
                 }
             }
 
-            if (!orderExists)
+            if (!orderExists || orderDetails == null || Math.Abs((decimal)orderDetails.TotalAmount - paymentRequest.Amount) > 0.01m)
             {
-                await PublishPaymentFailedAsync(paymentRequest, "Order not found after retries", "ORDER_NOT_FOUND");
-                return;
-            }
-
-            if (orderDetails == null)
-            {
-                await PublishPaymentFailedAsync(paymentRequest, "Could not retrieve order details", "ORDER_DETAILS_ERROR");
-                return;
-            }
-
-            if (Math.Abs((decimal)orderDetails.TotalAmount - paymentRequest.Amount) > 0.01m)
-            {
-                await PublishPaymentFailedAsync(paymentRequest, "Amount mismatch", "AMOUNT_MISMATCH");
+                // Payment failed, just log and return (no event publishing)
+                _logger.LogWarning("Payment failed for order {OrderId}: validation failed or amount mismatch", paymentRequest.OrderId);
                 return;
             }
 
@@ -123,29 +113,14 @@ public class PaymentRequestedEventHandler : IConsumer<PaymentRequestedEvent>
             {
                 payment.Status = "Failed";
                 await _context.SaveChangesAsync();
-
-                await PublishPaymentFailedAsync(paymentRequest, "Payment gateway declined", "PAYMENT_DECLINED");
+                _logger.LogWarning("Payment failed for order {OrderId}: Payment gateway declined", paymentRequest.OrderId);
+                // No PaymentFailedEvent published
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing payment request for order {OrderId}", paymentRequest.OrderId);
-            await PublishPaymentFailedAsync(paymentRequest, ex.Message, "PROCESSING_ERROR");
+            // No PaymentFailedEvent published
         }
-    }
-
-    private async Task PublishPaymentFailedAsync(PaymentRequestedEvent request, string reason, string errorCode)
-    {
-        await _publishEndpoint.Publish(new PaymentFailedEvent
-        {
-            OrderId = request.OrderId,
-            UserId = request.UserId,
-            Amount = request.Amount,
-            Reason = reason,
-            ErrorCode = errorCode,
-            FailedAt = DateTime.UtcNow
-        });
-
-        _logger.LogWarning("Payment failed for order {OrderId}: {Reason}", request.OrderId, reason);
     }
 }
