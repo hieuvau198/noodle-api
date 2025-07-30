@@ -83,6 +83,19 @@ namespace OrderService.Application.Services
                     await _orderRepository.UpdateAsync(createdOrder);
                 }
 
+                // Immediately request payment for the order via event
+                var paymentRequestedEvent = new PaymentRequestedEvent
+                {
+                    OrderId = createdOrder.OrderId,
+                    UserId = createdOrder.UserId,
+                    Amount = createdOrder.TotalAmount,
+                    Currency = "VND",
+                    RequestedAt = DateTime.UtcNow
+                };
+
+                await _publishEndpoint.Publish(paymentRequestedEvent);
+                _logger.LogInformation("Payment requested for order {OrderId} via event", createdOrder.OrderId);
+
                 // Publish OrderCreated event
                 var orderCreatedEvent = new OrderCreatedEvent
                 {
@@ -172,6 +185,37 @@ namespace OrderService.Application.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving orders for user {UserId}", userId);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<OrderResult>> GetAllOrdersAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var orders = await _context.Orders
+                    .Include(o => o.OrderItems)
+                    .ToListAsync(cancellationToken);
+
+                return orders.Select(order => new OrderResult
+                {
+                    OrderId = order.OrderId,
+                    UserId = order.UserId,
+                    Status = order.Status,
+                    TotalAmount = order.TotalAmount,
+                    CreatedAt = order.CreatedAt,
+                    Items = order.OrderItems.Select(oi => new OrderItemResult
+                    {
+                        OrderItemId = oi.OrderItemId,
+                        NoodleId = oi.NoodleId,
+                        Quantity = oi.Quantity,
+                        Subtotal = oi.Subtotal
+                    }).ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving all orders");
                 throw;
             }
         }

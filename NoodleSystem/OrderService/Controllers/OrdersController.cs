@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using OrderService.Domain;
+using OrderService.Application.Services;
+using OrderService.Application.Dtos;
 
 namespace OrderService.Controllers;
 
@@ -8,12 +9,12 @@ namespace OrderService.Controllers;
 [Route("api/[controller]")]
 public class OrdersController : ControllerBase
 {
-    private readonly OrderDbContext _context;
+    private readonly IOrderService _orderService;
     private readonly ILogger<OrdersController> _logger;
 
-    public OrdersController(OrderDbContext context, ILogger<OrdersController> logger)
+    public OrdersController(IOrderService orderService, ILogger<OrdersController> logger)
     {
-        _context = context;
+        _orderService = orderService;
         _logger = logger;
     }
 
@@ -22,10 +23,15 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var orderCount = await _context.Orders.CountAsync();
-            var noodleCount = await _context.SpicyNoodles.CountAsync();
+            // Test service connection by getting counts via service methods
+            var orders = await _orderService.GetAllOrdersAsync();
+            var noodles = await _orderService.GetAvailableNoodlesAsync();
+            
+            var orderCount = orders.Count();
+            var noodleCount = noodles.Count();
+            
             return Ok(new { 
-                message = "Order database connection successful!", 
+                message = "Order service connection successful!", 
                 orderCount = orderCount,
                 noodleCount = noodleCount,
                 timestamp = DateTime.UtcNow 
@@ -33,9 +39,9 @@ public class OrdersController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Order database connection test failed");
+            _logger.LogError(ex, "Order service connection test failed");
             return StatusCode(500, new { 
-                message = "Order database connection failed", 
+                message = "Order service connection failed", 
                 error = ex.Message,
                 timestamp = DateTime.UtcNow 
             });
@@ -47,21 +53,21 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var orders = await _context.Orders
-                .Include(o => o.OrderItems)
-                .Select(o => new
-                {
-                    o.OrderId,
-                    o.UserId,
-                    o.Status,
-                    o.TotalAmount,
-                    o.CreatedAt,
-                    o.UpdatedAt,
-                    ItemCount = o.OrderItems.Count
-                })
-                .ToListAsync();
+            var results = await _orderService.GetAllOrdersAsync();
 
-            return Ok(orders);
+            // Map OrderResult to response format (maintaining API contract)
+            var response = results.Select(result => new
+            {
+                result.OrderId,
+                result.UserId,
+                result.Status,
+                result.TotalAmount,
+                result.CreatedAt,
+                UpdatedAt = result.CreatedAt, // OrderResult doesn't have UpdatedAt
+                ItemCount = result.Items.Count
+            });
+
+            return Ok(response);
         }
         catch (Exception ex)
         {
@@ -75,42 +81,40 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var order = await _context.Orders
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Noodle)
-                .Where(o => o.OrderId == id)
-                .Select(o => new
-                {
-                    o.OrderId,
-                    o.UserId,
-                    o.Status,
-                    o.TotalAmount,
-                    o.CreatedAt,
-                    o.UpdatedAt,
-                    OrderItems = o.OrderItems.Select(oi => new
-                    {
-                        oi.OrderItemId,
-                        oi.NoodleId,
-                        oi.Quantity,
-                        oi.Subtotal,
-                        oi.CreatedAt,
-                        Noodle = new
-                        {
-                            oi.Noodle.NoodleId,
-                            oi.Noodle.Name,
-                            oi.Noodle.BasePrice,
-                            oi.Noodle.Description
-                        }
-                    })
-                })
-                .FirstOrDefaultAsync();
-
-            if (order == null)
+            var result = await _orderService.GetOrderAsync(id);
+            
+            if (result == null)
             {
                 return NotFound(new { message = "Order not found" });
             }
 
-            return Ok(order);
+            // Map OrderResult to response format (maintaining API contract)
+            return Ok(new
+            {
+                result.OrderId,
+                result.UserId,
+                result.Status,
+                result.TotalAmount,
+                result.CreatedAt,
+                UpdatedAt = result.CreatedAt, // OrderResult doesn't have UpdatedAt, using CreatedAt
+                OrderItems = result.Items.Select(item => new
+                {
+                    OrderItemId = item.OrderItemId,
+                    NoodleId = item.NoodleId,
+                    Quantity = item.Quantity,
+                    Subtotal = item.Subtotal,
+                    CreatedAt = result.CreatedAt,
+                    // Note: Noodle details not available in OrderResult.Items
+                    // This is a limitation of the current service structure
+                    Noodle = new
+                    {
+                        NoodleId = item.NoodleId,
+                        Name = "N/A", // Not available in service result
+                        BasePrice = 0m, // Not available in service result  
+                        Description = "N/A" // Not available in service result
+                    }
+                })
+            });
         }
         catch (Exception ex)
         {
@@ -124,22 +128,21 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var orders = await _context.Orders
-                .Where(o => o.UserId == userId)
-                .Include(o => o.OrderItems)
-                .Select(o => new
-                {
-                    o.OrderId,
-                    o.UserId,
-                    o.Status,
-                    o.TotalAmount,
-                    o.CreatedAt,
-                    o.UpdatedAt,
-                    ItemCount = o.OrderItems.Count
-                })
-                .ToListAsync();
+            var results = await _orderService.GetOrdersByUserAsync(userId);
 
-            return Ok(orders);
+            // Map OrderResult to response format (maintaining API contract)
+            var response = results.Select(result => new
+            {
+                result.OrderId,
+                result.UserId,
+                result.Status,
+                result.TotalAmount,
+                result.CreatedAt,
+                UpdatedAt = result.CreatedAt, // OrderResult doesn't have UpdatedAt
+                ItemCount = result.Items.Count
+            });
+
+            return Ok(response);
         }
         catch (Exception ex)
         {
@@ -153,20 +156,20 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var noodles = await _context.SpicyNoodles
-                .Where(n => n.IsActive)
-                .Select(n => new
-                {
-                    n.NoodleId,
-                    n.Name,
-                    n.BasePrice,
-                    n.ImageUrl,
-                    n.Description,
-                    n.CreatedAt
-                })
-                .ToListAsync();
+            var noodles = await _orderService.GetAvailableNoodlesAsync();
 
-            return Ok(noodles);
+            // Map SpicyNoodle to response format (maintaining API contract)
+            var response = noodles.Select(n => new
+            {
+                n.NoodleId,
+                n.Name,
+                n.BasePrice,
+                n.ImageUrl,
+                n.Description,
+                n.CreatedAt
+            });
+
+            return Ok(response);
         }
         catch (Exception ex)
         {
@@ -180,58 +183,28 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var order = new Order
+            // Map request to command
+            var command = new CreateOrderCommand
             {
                 UserId = request.UserId,
-                Status = "Pending",
-                TotalAmount = 0,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                Items = request.Items?.Select(item => new CreateOrderItemCommand
+                {
+                    NoodleId = item.NoodleId,
+                    Quantity = item.Quantity
+                }).ToList() ?? new()
             };
 
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync();
+            // Use OrderService for business logic and event-driven payment creation
+            var result = await _orderService.CreateOrderAsync(command);
 
-            if (request.Items != null && request.Items.Any())
+            // Return response maintaining API contract
+            return CreatedAtAction(nameof(GetOrder), new { id = result.OrderId }, new
             {
-                foreach (var item in request.Items)
-                {
-                    var noodle = await _context.SpicyNoodles.FindAsync(item.NoodleId);
-                    if (noodle == null)
-                    {
-                        return BadRequest(new { message = $"Noodle with ID {item.NoodleId} not found" });
-                    }
-
-                    var orderItem = new OrderItem
-                    {
-                        OrderId = order.OrderId,
-                        NoodleId = item.NoodleId,
-                        Quantity = item.Quantity,
-                        Subtotal = noodle.BasePrice * item.Quantity,
-                        CreatedAt = DateTime.UtcNow
-                    };
-
-                    _context.OrderItems.Add(orderItem);
-                }
-
-                await _context.SaveChangesAsync();
-
-                order.TotalAmount = await _context.OrderItems
-                    .Where(oi => oi.OrderId == order.OrderId)
-                    .SumAsync(oi => oi.Subtotal);
-                order.UpdatedAt = DateTime.UtcNow;
-
-                await _context.SaveChangesAsync();
-            }
-
-            return CreatedAtAction(nameof(GetOrder), new { id = order.OrderId }, new
-            {
-                order.OrderId,
-                order.UserId,
-                order.Status,
-                order.TotalAmount,
-                order.CreatedAt,
-                order.UpdatedAt
+                result.OrderId,
+                result.UserId,
+                result.Status,
+                result.TotalAmount,
+                result.CreatedAt
             });
         }
         catch (Exception ex)
@@ -246,21 +219,17 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var order = await _context.Orders.FindAsync(id);
-            if (order == null)
+            var success = await _orderService.UpdateOrderStatusAsync(id, request.Status);
+            
+            if (!success)
             {
                 return NotFound(new { message = "Order not found" });
             }
 
-            order.Status = request.Status;
-            order.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
             return Ok(new { 
                 message = "Order status updated successfully",
-                orderId = order.OrderId,
-                newStatus = order.Status
+                orderId = id,
+                newStatus = request.Status
             });
         }
         catch (Exception ex)

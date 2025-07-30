@@ -27,6 +27,9 @@ builder.Services.AddMassTransit(x =>
         var connectionString = builder.Configuration.GetConnectionString("rabbitmq");
         cfg.Host(connectionString);
         
+        // Simple immediate retry for initialization issues
+        cfg.UseMessageRetry(retry => retry.Immediate(3));
+        
         cfg.ConfigureEndpoints(context);
     });
 });
@@ -35,10 +38,10 @@ builder.Services.AddMassTransit(x =>
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IOrderService, OrderService.Application.Services.OrderService>();
 
-// Register new application services
+// Register application services
 builder.Services.AddHttpClient<IPaymentServiceClient, PaymentServiceClient>(client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7204");
+    client.BaseAddress = new Uri("https://payment-service");
 });
 
 // Add services to the container.
@@ -48,6 +51,20 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// Initialize PaymentServiceClient to avoid lazy initialization issues
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var paymentClient = scope.ServiceProvider.GetRequiredService<IPaymentServiceClient>();
+        _ = await paymentClient.GetPaymentStatusAsync(0);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"PaymentServiceClient initialization failed: {ex.Message}");
+    }
+}
 
 // Ensure database is created and seeded
 using (var scope = app.Services.CreateScope())
@@ -87,6 +104,9 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 app.MapGrpcService<OrderGrpcService>();
+
 app.MapDefaultEndpoints();
 
 app.Run();
+
+

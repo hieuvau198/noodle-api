@@ -20,6 +20,12 @@ public record OrderResult
     public decimal TotalAmount { get; init; }
     public DateTime CreatedAt { get; init; }
     public List<OrderItemResult> Items { get; init; } = new();
+    
+    // Payment information
+    public string? PaymentId { get; init; }
+    public string? PaymentUrl { get; init; }
+    public DateTime? PaymentExpiresAt { get; init; }
+    public string? PaymentErrorMessage { get; init; }
 }
 
 public record OrderItemResult

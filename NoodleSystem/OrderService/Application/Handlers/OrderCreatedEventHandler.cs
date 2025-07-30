@@ -30,12 +30,7 @@ public class OrderCreatedEventHandler : IConsumer<OrderCreatedEvent>
 
         try
         {
-
             await UpdateOrderStatusAsync(orderEvent);
-
-            await TrackOrderAnalyticsAsync(orderEvent);
-
-            await CreateAuditTrailAsync(orderEvent);
 
             _logger.LogInformation("Successfully processed OrderCreated event for Order {OrderId}", orderEvent.OrderId);
         }
@@ -64,73 +59,5 @@ public class OrderCreatedEventHandler : IConsumer<OrderCreatedEvent>
         }
     }
 
-    private async Task TrackOrderAnalyticsAsync(OrderCreatedEvent orderEvent)
-    {
-        _logger.LogInformation("Tracking analytics for Order {OrderId}", orderEvent.OrderId);
 
-        try
-        {
-
-            _logger.LogInformation(
-                "Order Analytics - OrderId: {OrderId}, UserId: {UserId}, ItemCount: {ItemCount}, TotalAmount: {TotalAmount}, CreatedAt: {CreatedAt}",
-                orderEvent.OrderId,
-                orderEvent.UserId,
-                orderEvent.Items.Count,
-                orderEvent.TotalAmount,
-                orderEvent.CreatedAt);
-
-            foreach (var item in orderEvent.Items)
-            {
-                _logger.LogInformation(
-                    "Item Analytics - NoodleId: {NoodleId}, Name: {Name}, Quantity: {Quantity}, Revenue: {Revenue}",
-                    item.NoodleId,
-                    item.NoodleName,
-                    item.Quantity,
-                    item.Subtotal);
-            }
-
-            await Task.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to track analytics for Order {OrderId}", orderEvent.OrderId);
-        }    
-    }
-
-    private async Task CreateAuditTrailAsync(OrderCreatedEvent orderEvent)
-    {
-        _logger.LogInformation("Creating audit trail for Order {OrderId}", orderEvent.OrderId);
-
-        try
-        {
-            Console.WriteLine("=== AUDIT TRAIL ===");
-            Console.WriteLine($"Event: OrderCreated");
-            Console.WriteLine($"Order ID: {orderEvent.OrderId}");
-            Console.WriteLine($"User ID: {orderEvent.UserId}");
-            Console.WriteLine($"Created At: {orderEvent.CreatedAt}");
-            Console.WriteLine($"Total Amount: {orderEvent.TotalAmount:C}");
-            Console.WriteLine($"Item Count: {orderEvent.Items.Count}");
-            Console.WriteLine("Items:");
-            foreach (var item in orderEvent.Items)
-            {
-                Console.WriteLine($"  - {item.NoodleName} x{item.Quantity} = {item.Subtotal:C}");
-            }
-            Console.WriteLine($"Audit logged at: {DateTime.UtcNow}");
-            Console.WriteLine("===================");
-
-            _logger.LogInformation(
-                "AUDIT: Order {OrderId} created by User {UserId} at {CreatedAt} with {ItemCount} items totaling {TotalAmount}",
-                orderEvent.OrderId,
-                orderEvent.UserId,
-                orderEvent.CreatedAt,
-                orderEvent.Items.Count,
-                orderEvent.TotalAmount);
-
-            await Task.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to create audit trail for Order {OrderId}", orderEvent.OrderId);
-        }
-    }
 }

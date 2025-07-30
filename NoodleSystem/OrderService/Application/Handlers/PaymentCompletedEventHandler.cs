@@ -34,10 +34,6 @@ public class PaymentCompletedEventHandler : IConsumer<PaymentCompletedEvent>
         {
             await UpdateOrderStatusToInPreparationAsync(paymentEvent);
 
-            await TrackPaymentAnalyticsAsync(paymentEvent);
-
-            await CreatePaymentAuditTrailAsync(paymentEvent);
-
             _logger.LogInformation("Successfully processed PaymentCompleted event for Order {OrderId}", paymentEvent.OrderId);
         }
         catch (Exception ex)
@@ -75,53 +71,7 @@ public class PaymentCompletedEventHandler : IConsumer<PaymentCompletedEvent>
         }
     }
 
-    private async Task TrackPaymentAnalyticsAsync(PaymentCompletedEvent paymentEvent)
-    {
-        _logger.LogInformation("Tracking payment analytics for Order {OrderId}", paymentEvent.OrderId);
 
-        try
-        {
-            _logger.LogInformation(
-                "Payment Analytics - OrderId: {OrderId}, UserId: {UserId}, AmountPaid: {AmountPaid}, Currency: {Currency}, PaymentMethod: {PaymentMethod}, TransactionId: {TransactionId}, PaidAt: {PaidAt}",
-                paymentEvent.OrderId,
-                paymentEvent.UserId,
-                paymentEvent.AmountPaid,
-                paymentEvent.Currency,
-                paymentEvent.PaymentMethod,
-                paymentEvent.TransactionId,
-                paymentEvent.PaidAt);
-
-            await Task.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to track payment analytics for Order {OrderId}", paymentEvent.OrderId);
-        }
-    }
-
-    private async Task CreatePaymentAuditTrailAsync(PaymentCompletedEvent paymentEvent)
-    {
-        _logger.LogInformation("Creating payment audit trail for Order {OrderId}", paymentEvent.OrderId);
-
-        try
-        {
-            _logger.LogInformation(
-                "AUDIT: Payment completed for Order {OrderId} by User {UserId} at {PaidAt} - Amount: {AmountPaid} {Currency}, Method: {PaymentMethod}, Transaction: {TransactionId}",
-                paymentEvent.OrderId,
-                paymentEvent.UserId,
-                paymentEvent.PaidAt,
-                paymentEvent.AmountPaid,
-                paymentEvent.Currency,
-                paymentEvent.PaymentMethod,
-                paymentEvent.TransactionId);
-
-            await Task.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to create payment audit trail for Order {OrderId}", paymentEvent.OrderId);
-        }
-    }
 
     private async Task HandlePaymentProcessingFailureAsync(PaymentCompletedEvent paymentEvent, string errorMessage)
     {

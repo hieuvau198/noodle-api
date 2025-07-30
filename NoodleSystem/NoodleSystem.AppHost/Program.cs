@@ -279,18 +279,19 @@ builder.AddProject<Projects.UserService>("user-service")
     .WithReference(spicyNoodleDbUser)
        .WaitFor(spicyNoodleDbUser);
 
-var orderService = builder.AddProject<Projects.OrderService>("order-service")
-    .WithReference(spicyNoodleDbOrder)
-    .WithReference(rabbitmq)
-    .WaitFor(spicyNoodleDbOrder)
-    .WaitFor(rabbitmq);
-
-builder.AddProject<Projects.PaymentService>("payment-service")
+var paymentService = builder.AddProject<Projects.PaymentService>("payment-service")
     .WithReference(spicyNoodleDbPayment)
-    .WithReference(orderService)
     .WithReference(rabbitmq)
     .WaitFor(spicyNoodleDbPayment)
     .WaitFor(rabbitmq);
+
+var orderService = builder.AddProject<Projects.OrderService>("order-service")
+    .WithReference(spicyNoodleDbOrder)
+    .WithReference(rabbitmq)
+    .WithReference(paymentService)
+    .WaitFor(spicyNoodleDbOrder)
+    .WaitFor(rabbitmq)
+    .WaitFor(paymentService);
 
 
 builder.Build().Run();

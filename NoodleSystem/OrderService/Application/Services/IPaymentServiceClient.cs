@@ -60,88 +60,90 @@ public class PaymentServiceClient : IPaymentServiceClient
     }
 
     public async Task<PaymentRequestResult> RequestPaymentAsync(PaymentRequestDto request)
+{
+    _logger.LogInformation("Requesting payment for order {OrderId}, amount {Amount} via gRPC", 
+        request.OrderId, request.Amount);
+
+    try
     {
-        _logger.LogInformation("Requesting payment for order {OrderId}, amount {Amount} via gRPC", 
-            request.OrderId, request.Amount);
-
-        try
+        var grpcRequest = new PaymentService.Grpc.PaymentRequestDto
         {
-            var grpcRequest = new PaymentService.Grpc.PaymentRequestDto
-            {
-                OrderId = request.OrderId,
-                UserId = request.UserId,
-                Amount = (double)request.Amount,
-                Currency = request.Currency,
-                RequestedAt = request.RequestedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
-            };
+            OrderId = request.OrderId,
+            UserId = request.UserId,
+            Amount = (double)request.Amount, // Convert decimal to double for gRPC
+            Currency = request.Currency,
+            RequestedAt = request.RequestedAt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ") // ISO 8601 format with milliseconds
+        };
 
-            var grpcResponse = await _grpcClient.RequestPaymentAsync(grpcRequest);
+        var grpcResponse = await _grpcClient.RequestPaymentAsync(grpcRequest);
 
-            return new PaymentRequestResult
-            {
-                Success = grpcResponse.Success,
-                PaymentId = grpcResponse.PaymentId,
-                PaymentUrl = grpcResponse.PaymentUrl,
-                ExpiresAt = string.IsNullOrEmpty(grpcResponse.ExpiresAt) ? null : DateTime.Parse(grpcResponse.ExpiresAt),
-                ErrorMessage = grpcResponse.ErrorMessage
-            };
-        }
-        catch (Exception ex)
+        return new PaymentRequestResult
         {
-            _logger.LogError(ex, "Error requesting payment for order {OrderId} via gRPC", request.OrderId);
-            return new PaymentRequestResult
-            {
-                Success = false,
-                ErrorMessage = ex.Message
-            };
-        }
+            Success = grpcResponse.Success,
+            PaymentId = grpcResponse.PaymentId,
+            PaymentUrl = grpcResponse.PaymentUrl,
+            ExpiresAt = string.IsNullOrEmpty(grpcResponse.ExpiresAt) ? null : 
+                DateTime.TryParse(grpcResponse.ExpiresAt, out var expiresAt) ? expiresAt : null,
+            ErrorMessage = grpcResponse.ErrorMessage
+        };
     }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error requesting payment for order {OrderId} via gRPC", request.OrderId);
+        return new PaymentRequestResult
+        {
+            Success = false,
+            ErrorMessage = ex.Message
+        };
+    }
+}
 
     public async Task<PaymentStatus> GetPaymentStatusAsync(int orderId)
+{
+    _logger.LogInformation("Getting payment status for order {OrderId} via gRPC", orderId);
+
+    try
     {
-        _logger.LogInformation("Getting payment status for order {OrderId} via gRPC", orderId);
-
-        try
+        var grpcRequest = new PaymentService.Grpc.GetPaymentStatusRequest
         {
-            var grpcRequest = new PaymentService.Grpc.GetPaymentStatusRequest
-            {
-                OrderId = orderId
-            };
+            OrderId = orderId
+        };
 
-            var grpcResponse = await _grpcClient.GetPaymentStatusAsync(grpcRequest);
+        var grpcResponse = await _grpcClient.GetPaymentStatusAsync(grpcRequest);
 
-            var result = new PaymentStatus
-            {
-                Status = grpcResponse.Status
-            };
-
-            if (!string.IsNullOrEmpty(grpcResponse.TransactionId))
-            {
-                result = result with 
-                { 
-                    TransactionId = grpcResponse.TransactionId,
-                    AmountPaid = (decimal)grpcResponse.AmountPaid,
-                    PaidAt = string.IsNullOrEmpty(grpcResponse.PaidAt) ? null : DateTime.Parse(grpcResponse.PaidAt)
-                };
-            }
-
-            if (!string.IsNullOrEmpty(grpcResponse.FailureReason))
-            {
-                result = result with { FailureReason = grpcResponse.FailureReason };
-            }
-
-            return result;
-        }
-        catch (Exception ex)
+        var result = new PaymentStatus
         {
-            _logger.LogError(ex, "Error getting payment status for order {OrderId} via gRPC", orderId);
-            return new PaymentStatus
-            {
-                Status = "Error",
-                FailureReason = ex.Message
+            Status = grpcResponse.Status
+        };
+
+        if (!string.IsNullOrEmpty(grpcResponse.TransactionId))
+        {
+            result = result with 
+            { 
+                TransactionId = grpcResponse.TransactionId,
+                AmountPaid = (decimal)grpcResponse.AmountPaid, // Convert double to decimal
+                PaidAt = string.IsNullOrEmpty(grpcResponse.PaidAt) ? null : 
+                    DateTime.TryParse(grpcResponse.PaidAt, out var paidAt) ? paidAt : null
             };
         }
+
+        if (!string.IsNullOrEmpty(grpcResponse.FailureReason))
+        {
+            result = result with { FailureReason = grpcResponse.FailureReason };
+        }
+
+        return result;
     }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error getting payment status for order {OrderId} via gRPC", orderId);
+        return new PaymentStatus
+        {
+            Status = "Error",
+            FailureReason = ex.Message
+        };
+    }
+}
 
     public async Task<bool> CancelPaymentAsync(int orderId, string reason)
     {

@@ -25,41 +25,37 @@ public class PaymentRequestedEventHandler : IConsumer<PaymentRequestedEvent>
     }
 
     public async Task Consume(ConsumeContext<PaymentRequestedEvent> context)
+{
+    var paymentEvent = context.Message;
+    
+    _logger.LogInformation("Processing PaymentRequested event for Order {OrderId}", paymentEvent.OrderId);
+
+    try
     {
-        var paymentEvent = context.Message;
-        
-        _logger.LogInformation(
-            "Processing PaymentRequested event for Order {OrderId}, User {UserId}, Amount {Amount}",
-            paymentEvent.OrderId,
-            paymentEvent.UserId,
-            paymentEvent.Amount);
+        // 1. Update order status to "AwaitingPayment"
+        await UpdateOrderStatusAsync(paymentEvent);
 
-        try
-        {
-            // 1. Update order status to "AwaitingPayment"
-            await UpdateOrderStatusAsync(paymentEvent);
+        // 2. Perform fraud detection checks
+        await PerformFraudDetectionAsync(paymentEvent);
 
-            // 2. Perform fraud detection checks
-            await PerformFraudDetectionAsync(paymentEvent);
+        // 3. Forward payment request to payment service
+        await ForwardPaymentRequestAsync(paymentEvent);
 
-            // 3. Forward payment request to payment service
-            await ForwardPaymentRequestAsync(paymentEvent);
+        // 4. Set up payment timeout
+        await SetupPaymentTimeoutAsync(paymentEvent);
 
-            // 4. Set up payment timeout
-            await SetupPaymentTimeoutAsync(paymentEvent);
-
-            _logger.LogInformation("Successfully processed PaymentRequested event for Order {OrderId}", paymentEvent.OrderId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing PaymentRequested event for Order {OrderId}", paymentEvent.OrderId);
-            
-            // Update order status to indicate payment processing failure
-            await UpdateOrderStatusToFailedAsync(paymentEvent.OrderId, ex.Message);
-            
-            throw; // Re-throw to let MassTransit handle retry logic
-        }
+        _logger.LogInformation("Successfully processed PaymentRequested event for Order {OrderId}", paymentEvent.OrderId);
     }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error processing PaymentRequested event for Order {OrderId}", paymentEvent.OrderId);
+        
+        // Update order status to indicate payment processing failure
+        await UpdateOrderStatusToFailedAsync(paymentEvent.OrderId, ex.Message);
+        
+        throw; // Re-throw to let MassTransit handle retry logic
+    }
+}
 
     private async Task UpdateOrderStatusAsync(PaymentRequestedEvent paymentEvent)
     {
@@ -98,18 +94,6 @@ public class PaymentRequestedEventHandler : IConsumer<PaymentRequestedEvent>
                 throw new InvalidOperationException($"Invalid payment amount: {paymentEvent.Amount}");
             }
 
-            if (paymentEvent.Amount > 1000) // Example: flag orders over $1000 VND (very high)
-            {
-                _logger.LogWarning("High-value order detected: Order {OrderId}, Amount {Amount}", 
-                    paymentEvent.OrderId, paymentEvent.Amount);
-                
-                // In a real system, you might:
-                // - Require additional verification
-                // - Send to manual review queue
-                // - Apply stricter validation
-            }
-
-            // Check for suspicious patterns (mock implementation)
             if (paymentEvent.UserId <= 0)
             {
                 throw new InvalidOperationException($"Invalid user ID: {paymentEvent.UserId}");
@@ -126,39 +110,44 @@ public class PaymentRequestedEventHandler : IConsumer<PaymentRequestedEvent>
     }
 
     private async Task ForwardPaymentRequestAsync(PaymentRequestedEvent paymentEvent)
+{
+    _logger.LogInformation("Processing payment request for Order {OrderId}, Amount: {Amount}", paymentEvent.OrderId, paymentEvent.Amount);
+
+    try
     {
-        _logger.LogInformation("Forwarding payment request to payment service for Order {OrderId}", paymentEvent.OrderId);
-
-        try
+        var paymentRequest = new PaymentRequestDto
         {
-            var paymentRequest = new PaymentRequestDto
-            {
-                OrderId = paymentEvent.OrderId,
-                UserId = paymentEvent.UserId,
-                Amount = paymentEvent.Amount,
-                Currency = paymentEvent.Currency,
-                RequestedAt = paymentEvent.RequestedAt
-            };
+            OrderId = paymentEvent.OrderId,
+            UserId = paymentEvent.UserId,
+            Amount = paymentEvent.Amount,
+            Currency = paymentEvent.Currency,
+            RequestedAt = paymentEvent.RequestedAt
+        };
 
-            var result = await _paymentServiceClient.RequestPaymentAsync(paymentRequest);
+        var result = await _paymentServiceClient.RequestPaymentAsync(paymentRequest);
 
-            if (!result.Success)
-            {
-                throw new InvalidOperationException($"Payment service request failed: {result.ErrorMessage}");
-            }
-
-            _logger.LogInformation("Payment request forwarded successfully for Order {OrderId}, PaymentId: {PaymentId}", 
-                paymentEvent.OrderId, result.PaymentId);
-
-            // Store payment details in metadata for future reference
-            // In a real system, you might store this in a separate payment tracking table
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            _logger.LogError(ex, "Failed to forward payment request for Order {OrderId}", paymentEvent.OrderId);
-            throw;
+            _logger.LogError("Payment request failed: {Error}", result.ErrorMessage);
+            throw new InvalidOperationException($"Payment service request failed: {result.ErrorMessage}");
         }
+
+        _logger.LogInformation("Payment request forwarded successfully for Order {OrderId}, PaymentId: {PaymentId}", 
+            paymentEvent.OrderId, result.PaymentId);
+
     }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "CRITICAL: Payment forwarding failed for Order {OrderId}", paymentEvent.OrderId);
+        _logger.LogError("Exception type: {ExceptionType}", ex.GetType().Name);
+        _logger.LogError("Exception message: {Message}", ex.Message);
+        if (ex.InnerException != null)
+        {
+            _logger.LogError("Inner exception: {InnerException}", ex.InnerException.Message);
+        }
+        throw;
+    }
+}
 
     private async Task SetupPaymentTimeoutAsync(PaymentRequestedEvent paymentEvent)
     {
@@ -166,17 +155,8 @@ public class PaymentRequestedEventHandler : IConsumer<PaymentRequestedEvent>
 
         try
         {
-            // Academic implementation: Console logging instead of background job scheduling
             var timeoutDuration = TimeSpan.FromMinutes(15); // 15-minute payment timeout
             var timeoutAt = paymentEvent.RequestedAt.Add(timeoutDuration);
-
-            Console.WriteLine("=== PAYMENT TIMEOUT SETUP ===");
-            Console.WriteLine($"Order ID: {paymentEvent.OrderId}");
-            Console.WriteLine($"Payment Requested At: {paymentEvent.RequestedAt}");
-            Console.WriteLine($"Timeout Duration: {timeoutDuration.TotalMinutes} minutes");
-            Console.WriteLine($"Timeout Scheduled At: {timeoutAt}");
-            Console.WriteLine("Background job would be created here in production");
-            Console.WriteLine("==============================");
 
             _logger.LogInformation("Payment timeout scheduled for Order {OrderId} at {TimeoutAt}", 
                 paymentEvent.OrderId, timeoutAt);
