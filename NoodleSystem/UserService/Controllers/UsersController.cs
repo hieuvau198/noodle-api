@@ -2,6 +2,8 @@
 using Microsoft.EntityFrameworkCore;
 using UserService.Domain.Context;
 using UserService.Domain.Entities;
+using UserService.Application.Services;
+using UserService.Application.Dtos;
 
 namespace UserService.Controllers;
 
@@ -11,11 +13,13 @@ public class UsersController : ControllerBase
 {
     private readonly SpicyNoodleDbContext _context;
     private readonly ILogger<UsersController> _logger;
+    private readonly IGoogleAuthService _googleAuthService;
 
-    public UsersController(SpicyNoodleDbContext context, ILogger<UsersController> logger)
+    public UsersController(SpicyNoodleDbContext context, ILogger<UsersController> logger, IGoogleAuthService googleAuthService)
     {
         _context = context;
         _logger = logger;
+        _googleAuthService = googleAuthService;
     }
 
     [HttpGet("test")]
@@ -142,6 +146,46 @@ public class UsersController : ControllerBase
             return StatusCode(500, new { message = "Error creating user", error = ex.Message });
         }
     }
+
+    [HttpPost("google-login")]
+    public async Task<ActionResult<AuthResult>> GoogleLogin([FromBody] GoogleLoginRequest request)
+    {
+        try
+        {
+            _logger.LogInformation("Google login request received");
+            
+            if (request == null)
+            {
+                _logger.LogWarning("Request body is null");
+                return BadRequest(new { message = "Request body is required" });
+            }
+
+            if (string.IsNullOrEmpty(request.IdToken))
+            {
+                _logger.LogWarning("ID token is empty or null");
+                return BadRequest(new { message = "ID token is required" });
+            }
+
+            _logger.LogInformation($"Processing Google login with token length: {request.IdToken.Length}");
+            var result = await _googleAuthService.AuthenticateGoogleUserAsync(request.IdToken);
+            
+            if (result.Success)
+            {
+                _logger.LogInformation("Google login successful");
+                return Ok(result);
+            }
+            else
+            {
+                _logger.LogWarning($"Google login failed: {result.Message}");
+                return BadRequest(result);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during Google login");
+            return StatusCode(500, new { message = "Error during Google login", error = ex.Message });
+        }
+    }
 }
 
 public class CreateUserRequest
@@ -151,4 +195,9 @@ public class CreateUserRequest
     public string? Password { get; set; }
     public string? GoogleId { get; set; }
     public int Role { get; set; } = 2;
+}
+
+public class GoogleLoginRequest
+{
+    public string IdToken { get; set; } = string.Empty;
 }

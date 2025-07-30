@@ -51,12 +51,13 @@ namespace UserService.Application.Services
                 return new AuthResult { Success = false, Message = "Invalid email or password" };
             }
 
-            var token = GenerateJwtToken(user);
+            var (token, tokenId) = GenerateJwtTokenWithId(user);
 
             return new AuthResult
             {
                 Success = true,
                 Token = token,
+                TokenId = tokenId,
                 User = new UserDto
                 {
                     UserId = user.UserId,
@@ -87,12 +88,13 @@ namespace UserService.Application.Services
             };
 
             var createdUser = await _userRepository.CreateAsync(user);
-            var token = GenerateJwtToken(createdUser);
+            var (token, tokenId) = GenerateJwtTokenWithId(createdUser);
 
             return new AuthResult
             {
                 Success = true,
                 Token = token,
+                TokenId = tokenId,
                 User = new UserDto
                 {
                     UserId = createdUser.UserId,
@@ -167,10 +169,13 @@ namespace UserService.Application.Services
             return true;
         }
 
-        private string GenerateJwtToken(User user)
+        private (string token, string tokenId) GenerateJwtTokenWithId(User user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Secret"] ?? "SpicyNoodleSecretKey12345");
+
+            // Generate a unique token ID
+            var tokenId = Guid.NewGuid().ToString();
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
@@ -179,14 +184,23 @@ namespace UserService.Application.Services
                     new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
                     new Claim(ClaimTypes.Name, user.FullName),
                     new Claim(ClaimTypes.Email, user.Email),
-                    new Claim(ClaimTypes.Role, user.Role.ToString())
+                    new Claim(ClaimTypes.Role, user.Role.ToString()),
+                    new Claim("TokenId", tokenId), // Add token ID to claims
+                    new Claim("jti", tokenId) // JWT ID claim
                 }),
                 Expires = DateTime.UtcNow.AddDays(7),
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256)
             };
 
             var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
+            var tokenString = tokenHandler.WriteToken(token);
+            return (tokenString, tokenId);
+        }
+
+        private string GenerateJwtToken(User user)
+        {
+            var (token, _) = GenerateJwtTokenWithId(user);
+            return token;
         }
 
         private string GenerateTemporaryPassword()

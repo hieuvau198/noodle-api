@@ -10,6 +10,7 @@ namespace UserService.Domain.Repositories
     {
         Task<User?> GetByIdAsync(int id);
         Task<User?> GetByEmailAsync(string email);
+        Task<User?> GetByGoogleIdAsync(string googleId);
         Task<IEnumerable<User>> GetAllAsync();
         Task<User> CreateAsync(User user);
         Task<User> UpdateAsync(User user);
@@ -37,6 +38,12 @@ namespace UserService.Domain.Repositories
         {
             return await _context.Users
                 .FirstOrDefaultAsync(u => u.Email == email);
+        }
+
+        public async Task<User?> GetByGoogleIdAsync(string googleId)
+        {
+            return await _context.Users
+                .FirstOrDefaultAsync(u => u.GoogleId == googleId && u.IsActive);
         }
 
         public async Task<IEnumerable<User>> GetAllAsync()

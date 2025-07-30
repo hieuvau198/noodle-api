@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoodleSystem - API Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .test-section {
+            margin: 2rem 0;
+            padding: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0.5rem;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-success {
+            background-color: #28a745;
+        }
+
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        .result {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .loading {
+            display: none;
+            margin: 1rem 0;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .config {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+
+        .config input {
+            width: 100%;
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🍜 NoodleSystem API Test</div>
+            <p>Kiểm tra các API endpoints</p>
+        </div>
+
+        <div class="config">
+            <h4>Configuration</h4>
+            <label>API Base URL:</label>
+            <input type="text" id="apiBaseUrl" value="https://localhost:7001" placeholder="https://localhost:7001">
+            <button class="btn" onclick="updateConfig()">Update Config</button>
+        </div>
+
+        <div class="test-section">
+            <h3>🔗 Database Connection Test</h3>
+            <p>Kiểm tra kết nối database</p>
+            <button class="btn" onclick="testDatabaseConnection()">
+                <span class="loading" id="db-loading">
+                    <span class="spinner"></span>
+                </span>
+                Test Database Connection
+            </button>
+            <div id="db-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>👥 Get All Users</h3>
+            <p>Lấy danh sách tất cả users</p>
+            <button class="btn" onclick="getAllUsers()">
+                <span class="loading" id="users-loading">
+                    <span class="spinner"></span>
+                </span>
+                Get Users
+            </button>
+            <div id="users-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔐 Google OAuth Test</h3>
+            <p>Test Google OAuth endpoint</p>
+            <input type="text" id="idToken" placeholder="Google ID Token" style="width: 100%; margin-bottom: 1rem;">
+            <button class="btn btn-success" onclick="testGoogleLogin()">
+                <span class="loading" id="google-loading">
+                    <span class="spinner"></span>
+                </span>
+                Test Google Login
+            </button>
+            <div id="google-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 API Status</h3>
+            <button class="btn" onclick="checkApiStatus()">Check API Status</button>
+            <div id="status-result" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        let API_BASE_URL = 'https://localhost:7001';
+
+        function updateConfig() {
+            API_BASE_URL = document.getElementById('apiBaseUrl').value;
+            showResult('status-result', 'Configuration updated: ' + API_BASE_URL, 'info');
+        }
+
+        function showLoading(elementId, show) {
+            const loading = document.getElementById(elementId);
+            loading.style.display = show ? 'inline' : 'none';
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.className = `result ${type}`;
+            element.textContent = message;
+            element.style.display = 'block';
+        }
+
+        async function makeRequest(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+
+                const data = await response.text();
+                
+                try {
+                    return {
+                        status: response.status,
+                        ok: response.ok,
+                        data: JSON.parse(data)
+                    };
+                } catch {
+                    return {
+                        status: response.status,
+                        ok: response.ok,
+                        data: data
+                    };
+                }
+            } catch (error) {
+                return {
+                    status: 0,
+                    ok: false,
+                    data: error.message
+                };
+            }
+        }
+
+        async function testDatabaseConnection() {
+            showLoading('db-loading', true);
+            
+            const result = await makeRequest(`${API_BASE_URL}/api/users/test`);
+            
+            if (result.ok) {
+                showResult('db-result', JSON.stringify(result.data, null, 2), 'success');
+            } else {
+                showResult('db-result', `Error: ${result.status}\n${JSON.stringify(result.data, null, 2)}`, 'error');
+            }
+            
+            showLoading('db-loading', false);
+        }
+
+        async function getAllUsers() {
+            showLoading('users-loading', true);
+            
+            const result = await makeRequest(`${API_BASE_URL}/api/users`);
+            
+            if (result.ok) {
+                showResult('users-result', JSON.stringify(result.data, null, 2), 'success');
+            } else {
+                showResult('users-result', `Error: ${result.status}\n${JSON.stringify(result.data, null, 2)}`, 'error');
+            }
+            
+            showLoading('users-loading', false);
+        }
+
+        async function testGoogleLogin() {
+            const idToken = document.getElementById('idToken').value;
+            
+            if (!idToken) {
+                showResult('google-result', 'Please enter a Google ID Token', 'error');
+                return;
+            }
+
+            showLoading('google-loading', true);
+            
+            const result = await makeRequest(`${API_BASE_URL}/api/users/google-login`, {
+                method: 'POST',
+                body: JSON.stringify({ idToken: idToken })
+            });
+            
+            if (result.ok) {
+                const data = result.data;
+                let resultText = JSON.stringify(data, null, 2);
+                
+                // Highlight TokenId if present
+                if (data.tokenId) {
+                    resultText = resultText.replace(
+                        /"tokenId":\s*"([^"]+)"/g,
+                        '"tokenId": "🔑 $1"'
+                    );
+                }
+                
+                // Highlight Token if present
+                if (data.token) {
+                    resultText = resultText.replace(
+                        /"token":\s*"([^"]+)"/g,
+                        '"token": "🔐 $1"'
+                    );
+                }
+                
+                showResult('google-result', resultText, 'success');
+            } else {
+                showResult('google-result', `Error: ${result.status}\n${JSON.stringify(result.data, null, 2)}`, 'error');
+            }
+            
+            showLoading('google-loading', false);
+        }
+
+        async function checkApiStatus() {
+            const endpoints = [
+                { name: 'Database Test', url: '/api/users/test' },
+                { name: 'Get Users', url: '/api/users' },
+                { name: 'Google Login', url: '/api/users/google-login', method: 'POST' }
+            ];
+
+            let statusReport = 'API Status Report:\n\n';
+
+            for (const endpoint of endpoints) {
+                try {
+                    const result = await makeRequest(`${API_BASE_URL}${endpoint.url}`, {
+                        method: endpoint.method || 'GET'
+                    });
+                    
+                    statusReport += `${endpoint.name}: ${result.ok ? '✅ OK' : '❌ Error (${result.status})'}\n`;
+                } catch (error) {
+                    statusReport += `${endpoint.name}: ❌ Connection Failed\n`;
+                }
+            }
+
+            showResult('status-result', statusReport, 'info');
+        }
+
+        // Auto-check API status on page load
+        window.onload = function() {
+            setTimeout(checkApiStatus, 1000);
+        };
+    </script>
+</body>
+</html> 
