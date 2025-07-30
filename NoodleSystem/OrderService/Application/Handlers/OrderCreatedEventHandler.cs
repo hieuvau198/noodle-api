@@ -9,13 +9,16 @@ public class OrderCreatedEventHandler : IConsumer<OrderCreatedEvent>
 {
     private readonly ILogger<OrderCreatedEventHandler> _logger;
     private readonly IOrderRepository _orderRepository;
+    private readonly IPublishEndpoint _publishEndpoint;
 
     public OrderCreatedEventHandler(
         ILogger<OrderCreatedEventHandler> logger,
-        IOrderRepository orderRepository)
+        IOrderRepository orderRepository,
+        IPublishEndpoint publishEndpoint)
     {
         _logger = logger;
         _orderRepository = orderRepository;
+        _publishEndpoint = publishEndpoint;
     }
 
     public async Task Consume(ConsumeContext<OrderCreatedEvent> context)
@@ -31,6 +34,9 @@ public class OrderCreatedEventHandler : IConsumer<OrderCreatedEvent>
         try
         {
             await UpdateOrderStatusAsync(orderEvent);
+
+            // Trigger payment request after order is confirmed to exist
+            await RequestPaymentAsync(orderEvent);
 
             _logger.LogInformation("Successfully processed OrderCreated event for Order {OrderId}", orderEvent.OrderId);
         }
@@ -59,5 +65,20 @@ public class OrderCreatedEventHandler : IConsumer<OrderCreatedEvent>
         }
     }
 
+    private async Task RequestPaymentAsync(OrderCreatedEvent orderEvent)
+    {
+        _logger.LogInformation("Requesting payment for Order {OrderId}", orderEvent.OrderId);
 
+        var paymentRequestedEvent = new PaymentRequestedEvent
+        {
+            OrderId = orderEvent.OrderId,
+            UserId = orderEvent.UserId,
+            Amount = orderEvent.TotalAmount,
+            Currency = "VND",
+            RequestedAt = DateTime.UtcNow
+        };
+
+        await _publishEndpoint.Publish(paymentRequestedEvent);
+        _logger.LogInformation("Payment requested for order {OrderId} via OrderCreated event", orderEvent.OrderId);
+    }
 }

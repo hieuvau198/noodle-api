@@ -36,14 +36,41 @@ public class PaymentRequestedEventHandler : IConsumer<PaymentRequestedEvent>
 
         try
         {
-            var orderExists = await _orderGrpcClient.ValidateOrderExistsAsync(paymentRequest.OrderId);
+            bool orderExists = false;
+            OrderDetails? orderDetails = null;
+            int retryCount = 0;
+            const int maxRetries = 3;
+            const int retryDelayMs = 200;
+
+            while (retryCount < maxRetries && !orderExists)
+            {
+                try
+                {
+                    orderExists = await _orderGrpcClient.ValidateOrderExistsAsync(paymentRequest.OrderId);
+                    if (orderExists)
+                    {
+                        orderDetails = await _orderGrpcClient.GetOrderDetailsAsync(paymentRequest.OrderId);
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Attempt {RetryCount} failed to validate order {OrderId}", retryCount + 1, paymentRequest.OrderId);
+                }
+
+                retryCount++;
+                if (retryCount < maxRetries)
+                {
+                    await Task.Delay(retryDelayMs * retryCount); 
+                }
+            }
+
             if (!orderExists)
             {
-                await PublishPaymentFailedAsync(paymentRequest, "Order not found", "ORDER_NOT_FOUND");
+                await PublishPaymentFailedAsync(paymentRequest, "Order not found after retries", "ORDER_NOT_FOUND");
                 return;
             }
 
-            var orderDetails = await _orderGrpcClient.GetOrderDetailsAsync(paymentRequest.OrderId);
             if (orderDetails == null)
             {
                 await PublishPaymentFailedAsync(paymentRequest, "Could not retrieve order details", "ORDER_DETAILS_ERROR");

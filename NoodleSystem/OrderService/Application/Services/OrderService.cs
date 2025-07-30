@@ -77,26 +77,17 @@ namespace OrderService.Application.Services
 
                     await _context.SaveChangesAsync();
 
-                    // Update order total
                     createdOrder.TotalAmount = totalAmount;
                     createdOrder.UpdatedAt = DateTime.UtcNow;
                     await _orderRepository.UpdateAsync(createdOrder);
                 }
 
-                // Immediately request payment for the order via event
-                var paymentRequestedEvent = new PaymentRequestedEvent
-                {
-                    OrderId = createdOrder.OrderId,
-                    UserId = createdOrder.UserId,
-                    Amount = createdOrder.TotalAmount,
-                    Currency = "VND",
-                    RequestedAt = DateTime.UtcNow
-                };
+                // Need to Commit the transaction first if not when consumer request order details, it will throw beacause it not have in db yet
+                await _context.SaveChangesAsync();
+                
+                // delay to ensure database transaction is fully committed
+                await Task.Delay(100);
 
-                await _publishEndpoint.Publish(paymentRequestedEvent);
-                _logger.LogInformation("Payment requested for order {OrderId} via event", createdOrder.OrderId);
-
-                // Publish OrderCreated event
                 var orderCreatedEvent = new OrderCreatedEvent
                 {
                     OrderId = createdOrder.OrderId,

@@ -42,6 +42,11 @@ public class OrderGrpcClient : IOrderGrpcClient
 
             _logger.LogInformation("Order validation result: {Exists} - {Message}", response.Exists, response.Message);
 
+            if (!response.Exists)
+            {
+                _logger.LogWarning("Order {OrderId} not found during validation", orderId);
+            }
+
             return response.Exists;
         }
         catch (Exception ex)
