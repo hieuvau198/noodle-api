@@ -105,6 +105,17 @@ namespace OrderService.Application.Services
                 await _publishEndpoint.Publish(orderCreatedEvent);
                 _logger.LogInformation("Order {OrderId} created and event published", createdOrder.OrderId);
 
+                // Publish PaymentRequestedEvent immediately after order creation
+                var paymentRequestedEvent = new PaymentRequestedEvent
+                {
+                    OrderId = createdOrder.OrderId,
+                    UserId = createdOrder.UserId,
+                    Amount = createdOrder.TotalAmount,
+                    RequestedAt = DateTime.UtcNow
+                };
+                await _publishEndpoint.Publish(paymentRequestedEvent);
+                _logger.LogInformation("Payment requested for order {OrderId} (auto on creation)", createdOrder.OrderId);
+
                 return new OrderResult
                 {
                     OrderId = createdOrder.OrderId,
@@ -238,20 +249,7 @@ namespace OrderService.Application.Services
                 await _publishEndpoint.Publish(statusChangedEvent);
                 _logger.LogInformation("Order {OrderId} status changed from {OldStatus} to {NewStatus}", orderId, oldStatus, newStatus);
 
-                // If order is confirmed, request payment
-                if (newStatus.Equals("Confirmed", StringComparison.OrdinalIgnoreCase))
-                {
-                    var paymentRequestedEvent = new PaymentRequestedEvent
-                    {
-                        OrderId = orderId,
-                        UserId = order.UserId,
-                        Amount = order.TotalAmount,
-                        RequestedAt = DateTime.UtcNow
-                    };
-
-                    await _publishEndpoint.Publish(paymentRequestedEvent);
-                    _logger.LogInformation("Payment requested for order {OrderId}", orderId);
-                }
+                // Removed: PaymentRequestedEvent publishing on status update
 
                 return true;
             }

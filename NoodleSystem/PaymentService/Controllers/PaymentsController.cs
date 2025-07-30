@@ -137,61 +137,44 @@ public class PaymentsController : ControllerBase
         }
     }
 
-    [HttpPost]
-    public async Task<ActionResult<Payment>> CreatePayment([FromBody] CreatePaymentRequest request)
+    [HttpPost("confirm")]
+    public async Task<ActionResult> ConfirmPayment([FromBody] ConfirmPaymentRequest request)
     {
         try
         {
-            var orderExists = await _orderGrpcClient.ValidateOrderExistsAsync(request.OrderId);
-            if (!orderExists)
+            var payment = await _context.Payments.FindAsync(request.PaymentId);
+            if (payment == null)
             {
-                _logger.LogWarning("Attempted to create payment for non-existent order {OrderId}", request.OrderId);
-                return BadRequest(new { message = $"Order with ID {request.OrderId} does not exist" });
+                return NotFound(new { message = "Payment not found" });
             }
 
-            var orderDetails = await _orderGrpcClient.GetOrderDetailsAsync(request.OrderId);
-            if (orderDetails is not null)
+            if (request.Status != "NotPaid" && request.Status != "Completed")
             {
-                _logger.LogInformation("Creating payment for order {OrderId} with amount {Amount}", request.OrderId, request.Amount);
+                return BadRequest(new { message = "Invalid status. Must be 'NotPaid' or 'Completed'" });
             }
 
-            var payment = new Payment
+            payment.Status = request.Status;
+            if (request.Status == "Completed" && !payment.PaidAt.HasValue)
             {
-                OrderId = request.OrderId,
-                Amount = request.Amount,
-                Status = request.Status ?? "Pending",
-                PaymentMethod = request.PaymentMethod,
-                TransactionId = request.TransactionId,
-                PaidAt = request.PaidAt,
-                CreatedAt = DateTime.UtcNow
-            };
+                payment.PaidAt = DateTime.UtcNow;
+            }
+            else if (request.Status == "NotPaid")
+            {
+                payment.PaidAt = null;
+            }
 
-            _context.Payments.Add(payment);
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Payment created successfully with ID {PaymentId} for order {OrderId}", payment.PaymentId, request.OrderId);
-
-            return CreatedAtAction(nameof(GetPayment), new { id = payment.PaymentId }, new
-            {
-                payment.PaymentId,
-                payment.OrderId,
-                payment.Amount,
-                payment.Status,
-                payment.PaymentMethod,
-                payment.TransactionId,
-                payment.PaidAt,
-                payment.CreatedAt
+            return Ok(new {
+                message = "Payment confirmation updated successfully",
+                paymentId = payment.PaymentId,
+                newStatus = payment.Status
             });
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogError(ex, "Order validation failed for order {OrderId}", request.OrderId);
-            return StatusCode(503, new { message = "Order service unavailable", error = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating payment for order {OrderId}", request.OrderId);
-            return StatusCode(500, new { message = "Error creating payment", error = ex.Message });
+            _logger.LogError(ex, "Error confirming payment {PaymentId}", request.PaymentId);
+            return StatusCode(500, new { message = "Error confirming payment", error = ex.Message });
         }
     }
 
@@ -228,14 +211,10 @@ public class PaymentsController : ControllerBase
     }
 }
 
-public class CreatePaymentRequest
+public class ConfirmPaymentRequest
 {
-    public int OrderId { get; set; }
-    public decimal Amount { get; set; }
-    public string? Status { get; set; }
-    public string? PaymentMethod { get; set; }
-    public string? TransactionId { get; set; }
-    public DateTime? PaidAt { get; set; }
+    public int PaymentId { get; set; }
+    public string Status { get; set; } = string.Empty; 
 }
 
 public class UpdatePaymentStatusRequest
