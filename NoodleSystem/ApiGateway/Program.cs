@@ -2,10 +2,17 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
-// Add services to the container.
+builder.Services.AddHttpClient("OrderService", client =>
+{
+    client.BaseAddress = new Uri("http://order-service/"); // Use the correct service name or URL
+});
+builder.Services.AddHttpClient("UserService", client =>
+{
+    client.BaseAddress = new Uri("http://user-service/"); // Use the correct service name or URL
+});
 
+// Add controllers
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -21,9 +28,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();

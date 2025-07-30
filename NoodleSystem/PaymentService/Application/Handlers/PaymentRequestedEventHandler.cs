@@ -1,4 +1,5 @@
 using MassTransit;
+using OrderService.Grpc;
 using PaymentService.Application.Events;
 using PaymentService.Application.Services;
 using PaymentService.Domain;
