@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoodleSystem - Google OAuth Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 2rem;
+        }
+
+        .google-signin-container {
+            margin: 2rem 0;
+        }
+
+        .result-container {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .user-info {
+            background-color: #e2e3e5;
+            border: 1px solid #d6d8db;
+            color: #383d41;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            text-align: left;
+        }
+
+        .loading {
+            display: none;
+            margin: 1rem 0;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .logout-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+
+        .logout-btn:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🍜 NoodleSystem</div>
+        <div class="subtitle">Google OAuth Login Test</div>
+        
+        <div class="google-signin-container">
+            <div id="google-signin-button"></div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Đang xử lý đăng nhập...</p>
+        </div>
+
+        <div class="result-container" id="result-container"></div>
+        
+        <div style="margin-top: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+            <h4>Debug Info</h4>
+            <button onclick="checkStoredData()" style="background: #007bff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer;">
+                Check Stored Data
+            </button>
+            <div id="debug-info" style="margin-top: 1rem; font-family: monospace; font-size: 0.9rem;"></div>
+        </div>
+    </div>
+
+    <!-- Google Sign-In API -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <script>
+        // Google OAuth Configuration
+        const GOOGLE_CLIENT_ID = '722513613922-k1u9lrc8t27vn28tdurqtsfc4jl6td1f.apps.googleusercontent.com';
+        const API_BASE_URL = 'https://localhost:7196'; // Thay đổi port nếu cần
+
+        // Initialize Google Sign-In
+        function initializeGoogleSignIn() {
+            google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: handleCredentialResponse,
+                auto_select: false,
+                cancel_on_tap_outside: true
+            });
+
+            // Render the sign-in button
+            google.accounts.id.renderButton(
+                document.getElementById("google-signin-button"),
+                { 
+                    theme: "outline", 
+                    size: "large",
+                    width: 300,
+                    text: "signin_with"
+                }
+            );
+        }
+
+        // Handle Google Sign-In response
+        async function handleCredentialResponse(response) {
+            showLoading(true);
+            
+            try {
+                const result = await authenticateWithBackend(response.credential);
+                
+                // Debug logging
+                console.log('Full response:', result);
+                console.log('Token:', result.token);
+                console.log('TokenId:', result.tokenId);
+                console.log('User:', result.user);
+                
+                if (result.success) {
+                    // Store JWT token and token ID
+                    localStorage.setItem('noodle_token', result.token);
+                    localStorage.setItem('noodle_tokenId', result.tokenId);
+                    localStorage.setItem('noodle_user', JSON.stringify(result.user));
+                    
+                    showSuccess('Đăng nhập thành công!', result.user, result.tokenId, result.token);
+                } else {
+                    showError('Đăng nhập thất bại: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error during authentication:', error);
+                showError('Lỗi kết nối: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Send ID token to backend
+        async function authenticateWithBackend(idToken) {
+            const requestBody = {
+                idToken: idToken
+            };
+            
+            console.log('Sending request to:', `${API_BASE_URL}/api/users/google-login`);
+            console.log('Request body:', requestBody);
+            console.log('ID Token length:', idToken.length);
+            
+            const response = await fetch(`${API_BASE_URL}/api/users/google-login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Error response body:', errorText);
+                throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+            }
+
+            return await response.json();
+        }
+
+        // UI Helper Functions
+        function showLoading(show) {
+            const loading = document.getElementById('loading');
+            loading.style.display = show ? 'block' : 'none';
+        }
+
+        function showSuccess(message, user, tokenId, token) {
+            const container = document.getElementById('result-container');
+            container.className = 'result-container success';
+            container.style.display = 'block';
+            
+            container.innerHTML = `
+                <h3>✅ ${message}</h3>
+                <div class="user-info">
+                    <strong>Thông tin user:</strong><br>
+                    <strong>ID:</strong> ${user.userId}<br>
+                    <strong>Tên:</strong> ${user.fullName}<br>
+                    <strong>Email:</strong> ${user.email}<br>
+                    <strong>Role:</strong> ${user.role}<br>
+                    <strong>Google User:</strong> ${user.isGoogleUser ? 'Có' : 'Không'}<br>
+                    <strong>Token ID:</strong> ${tokenId || 'N/A'}<br>
+                    <strong>Token:</strong> ${token ? token.substring(0, 50) + '...' : 'N/A'}
+                </div>
+                <button class="logout-btn" onclick="logout()">Đăng xuất</button>
+            `;
+        }
+
+        function showError(message) {
+            const container = document.getElementById('result-container');
+            container.className = 'result-container error';
+            container.style.display = 'block';
+            container.innerHTML = `<h3>❌ ${message}</h3>`;
+        }
+
+        function logout() {
+            localStorage.removeItem('noodle_token');
+            localStorage.removeItem('noodle_tokenId');
+            localStorage.removeItem('noodle_user');
+            document.getElementById('result-container').style.display = 'none';
+            
+            // Re-render Google Sign-In button
+            google.accounts.id.disableAutoSelect();
+            google.accounts.id.renderButton(
+                document.getElementById("google-signin-button"),
+                { 
+                    theme: "outline", 
+                    size: "large",
+                    width: 300,
+                    text: "signin_with"
+                }
+            );
+        }
+
+        // Check if user is already logged in
+        function checkExistingLogin() {
+            const token = localStorage.getItem('noodle_token');
+            const tokenId = localStorage.getItem('noodle_tokenId');
+            const user = localStorage.getItem('noodle_user');
+            
+            if (token && user) {
+                try {
+                    const userData = JSON.parse(user);
+                    showSuccess('Đã đăng nhập sẵn!', userData, tokenId, token);
+                } catch (e) {
+                    localStorage.removeItem('noodle_token');
+                    localStorage.removeItem('noodle_tokenId');
+                    localStorage.removeItem('noodle_user');
+                }
+            }
+        }
+
+
+
+        // Check stored data for debugging
+        function checkStoredData() {
+            const token = localStorage.getItem('noodle_token');
+            const tokenId = localStorage.getItem('noodle_tokenId');
+            const user = localStorage.getItem('noodle_user');
+            
+            const debugInfo = document.getElementById('debug-info');
+            debugInfo.innerHTML = `
+                <strong>Stored Token:</strong> ${token ? token.substring(0, 50) + '...' : 'N/A'}<br>
+                <strong>Stored TokenId:</strong> ${tokenId || 'N/A'}<br>
+                <strong>Stored User:</strong> ${user || 'N/A'}<br>
+                <strong>Token Length:</strong> ${token ? token.length : 0}<br>
+                <strong>TokenId Length:</strong> ${tokenId ? tokenId.length : 0}
+            `;
+        }
+
+        // Initialize when page loads
+        window.onload = function() {
+            // Wait for Google API to load
+            setTimeout(() => {
+                initializeGoogleSignIn();
+                checkExistingLogin();
+            }, 1000);
+        };
+    </script>
+</body>
+</html> 

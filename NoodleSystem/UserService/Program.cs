@@ -14,6 +14,8 @@ builder.AddSqlServerDbContext<SpicyNoodleDbContext>("spicyNoodleDbUser");
 builder.Services.AddControllers();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUsersService, UsersService>();
+builder.Services.AddScoped<IGoogleAuthService, GoogleAuthService>();
+builder.Services.AddHttpClient();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -43,9 +45,14 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseDefaultFiles(); // Enable default files (index.html)
+app.UseStaticFiles(); // Enable static files
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapDefaultEndpoints();
+
+// Serve the API test page
+app.MapGet("/test-api", () => Results.File("wwwroot/test-api.html", "text/html"));
 
 app.Run();
