@@ -1,5 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using UserService.Domain.Context;
 using UserService.Domain.Entities;
 using UserService.Application.Services;
@@ -14,12 +18,14 @@ public class UsersController : ControllerBase
     private readonly SpicyNoodleDbContext _context;
     private readonly ILogger<UsersController> _logger;
     private readonly IGoogleAuthService _googleAuthService;
+    private readonly IConfiguration _configuration;
 
-    public UsersController(SpicyNoodleDbContext context, ILogger<UsersController> logger, IGoogleAuthService googleAuthService)
+    public UsersController(SpicyNoodleDbContext context, ILogger<UsersController> logger, IGoogleAuthService googleAuthService, IConfiguration configuration)
     {
         _context = context;
         _logger = logger;
         _googleAuthService = googleAuthService;
+        _configuration = configuration;
     }
 
     [HttpGet("test")]
@@ -147,6 +153,68 @@ public class UsersController : ControllerBase
         }
     }
 
+    [HttpPost("login")]
+    public async Task<ActionResult<AuthResult>> Login([FromBody] LoginRequest request)
+    {
+        try
+        {
+            _logger.LogInformation("Login request received for email: {Email}", request.Email);
+
+            if (request == null || string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Password))
+            {
+                return BadRequest(new { message = "Email and password are required" });
+            }
+
+            // Find user by email
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == request.Email && u.IsActive);
+
+            if (user == null)
+            {
+                _logger.LogWarning("Login failed: User not found for email {Email}", request.Email);
+                return BadRequest(new { message = "Invalid email or password" });
+            }
+
+            // For Google users, they should use Google login
+            if (user.IsGoogleUser)
+            {
+                return BadRequest(new { message = "Please use Google login for this account" });
+            }
+
+            // Simple password verification (in production, use proper hashing)
+            if (user.Password != request.Password)
+            {
+                _logger.LogWarning("Login failed: Invalid password for email {Email}", request.Email);
+                return BadRequest(new { message = "Invalid email or password" });
+            }
+
+            // Generate JWT token
+            var token = GenerateJwtToken(user);
+
+            _logger.LogInformation("Login successful for user {UserId}", user.UserId);
+
+            return Ok(new AuthResult
+            {
+                Success = true,
+                Token = token,
+                Message = "Login successful",
+                User = new UserDto
+                {
+                    UserId = user.UserId,
+                    FullName = user.FullName,
+                    Email = user.Email,
+                    Role = user.Role,
+                    IsGoogleUser = user.IsGoogleUser
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during login");
+            return StatusCode(500, new { message = "Error during login", error = ex.Message });
+        }
+    }
+
     [HttpPost("google-login")]
     public async Task<ActionResult<AuthResult>> GoogleLogin([FromBody] GoogleLoginRequest request)
     {
@@ -186,6 +254,33 @@ public class UsersController : ControllerBase
             return StatusCode(500, new { message = "Error during Google login", error = ex.Message });
         }
     }
+
+    private string GenerateJwtToken(User user)
+    {
+        var jwtSettings = _configuration.GetSection("Jwt");
+        var secretKey = jwtSettings["Secret"] ?? "SpicyNoodleSecretKey12345678901234567890";
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+            new Claim(ClaimTypes.Email, user.Email),
+            new Claim(ClaimTypes.Name, user.FullName),
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
+            new Claim("IsGoogleUser", user.IsGoogleUser.ToString())
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: jwtSettings["Issuer"] ?? "SpicyNoodleAPI",
+            audience: jwtSettings["Audience"] ?? "SpicyNoodleClient",
+            claims: claims,
+            expires: DateTime.UtcNow.AddDays(Convert.ToInt32(jwtSettings["ExpirationInDays"] ?? "7")),
+            signingCredentials: credentials
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
 }
 
 public class CreateUserRequest
@@ -195,6 +290,12 @@ public class CreateUserRequest
     public string? Password { get; set; }
     public string? GoogleId { get; set; }
     public int Role { get; set; } = 2;
+}
+
+public class LoginRequest
+{
+    public string Email { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
 }
 
 public class GoogleLoginRequest

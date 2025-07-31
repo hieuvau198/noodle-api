@@ -1,0 +1,746 @@
+{
+	"info": {
+		"_postman_id": "noodle-system-core-tests",
+		"name": "Noodle System Core Tests",
+		"description": "Core API tests for the Noodle System microservices - focused on essential endpoints",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "User Service",
+			"item": [
+				{
+					"name": "Get All Users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiGatewayUrl}}/users-service/api/users",
+							"host": [
+								"{{apiGatewayUrl}}"
+							],
+							"path": [
+								"users-service",
+								"api",
+								"users"
+							]
+						},
+						"description": "Get all active users from the system"
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is an array\", function () {",
+									"    const responseJson = pm.response.json();",
+									"    pm.expect(responseJson).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Users have required fields\", function () {",
+									"    const responseJson = pm.response.json();",
+									"    if (responseJson.length > 0) {",
+									"        const user = responseJson[0];",
+									"        pm.expect(user).to.have.property('userId');",
+									"        pm.expect(user).to.have.property('fullName');",
+									"        pm.expect(user).to.have.property('email');",
+									"        pm.expect(user).to.have.property('role');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "Get User by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiGatewayUrl}}/users-service/api/users/1",
+							"host": [
+								"{{apiGatewayUrl}}"
+							],
+							"path": [
+								"users-service",
+								"api",
+								"users",
+								"1"
+							]
+						},
+						"description": "Get specific user by ID (using ID 1 from seed data)"
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 or 404\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+									"});",
+									"",
+									"pm.test(\"If user exists, has required fields\", function () {",
+									"    if (pm.response.code === 200) {",
+									"        const user = pm.response.json();",
+									"        pm.expect(user).to.have.property('userId');",
+									"        pm.expect(user).to.have.property('fullName');",
+									"        pm.expect(user).to.have.property('email');",
+									"        pm.expect(user).to.have.property('role');",
+									"        pm.expect(user.userId).to.eql(1);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "Create User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"John Doe\",\n  \"email\": \"john.doe@example.com\",\n  \"password\": \"password123\",\n  \"role\": 2\n}"
+						},
+						"url": {
+							"raw": "{{apiGatewayUrl}}/users-service/api/users",
+							"host": [
+								"{{apiGatewayUrl}}"
+							],
+							"path": [
+								"users-service",
+								"api",
+								"users"
+							]
+						},
+						"description": "Create a new user account"
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201 or 400\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([201, 400]);",
+									"});",
+									"",
+									"pm.test(\"If created successfully, has required fields\", function () {",
+									"    if (pm.response.code === 201) {",
+									"        const user = pm.response.json();",
+									"        pm.expect(user).to.have.property('userId');",
+									"        pm.expect(user).to.have.property('fullName');",
+									"        pm.expect(user).to.have.property('email');",
+									"        pm.expect(user).to.have.property('role');",
+									"        pm.expect(user.fullName).to.eql('John Doe');",
+									"        pm.expect(user.email).to.eql('john.doe@example.com');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "User Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john.doe@email.com\",\n  \"password\": \"hashedpassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{apiGatewayUrl}}/users-service/api/users/login",
+							"host": [
+								"{{apiGatewayUrl}}"
+							],
+							"path": [
+								"users-service",
+								"api",
+								"users",
+								"login"
+							]
+						},
+						"description": "Login with email and password (using seed data credentials)"
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Clear any existing token before login",
+									"pm.environment.unset('authToken');",
+									"console.log('Cleared existing authToken before login');"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 or 400\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+									"});",
+									"",
+									"pm.test(\"If login successful, has required fields\", function () {",
+									"    if (pm.response.code === 200) {",
+									"        const result = pm.response.json();",
+									"        pm.expect(result).to.have.property('success');",
+									"        pm.expect(result).to.have.property('token');",
+									"        pm.expect(result).to.have.property('user');",
+									"        pm.expect(result.success).to.be.true;",
+									"        ",
+									"        // Store token for other requests",
+									"        if (result.token) {",
+									"            pm.environment.set('authToken', result.token);",
+									"            console.log('Token stored successfully:', result.token.substring(0, 50) + '...');",
+									"            console.log('Token length:', result.token.length);",
+									"        } else {",
+									"            console.log('No token found in response');",
+									"        }",
+									"    }",
+									"});",
+									"",
+									"// Debug: Always log response details",
+									"console.log('Login response status:', pm.response.code);",
+									"if (pm.response.code === 200) {",
+									"    const result = pm.response.json();",
+									"    console.log('Response has token:', !!result.token);",
+									"    console.log('Stored authToken:', pm.environment.get('authToken') ? 'Yes' : 'No');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "Check Token Storage",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{apiGatewayUrl}}/health",
+							"host": [
+								"{{apiGatewayUrl}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Check if token was stored after login"
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Check if token was stored",
+									"const authToken = pm.environment.get('authToken');",
+									"console.log('=== TOKEN STORAGE CHECK ===');",
+									"console.log('authToken exists:', !!authToken);",
+									"if (authToken) {",
+									"    console.log('Token length:', authToken.length);",
+									"    console.log('Token preview:', authToken.substring(0, 50) + '...');",
+									"    console.log('Token starts with Bearer:', authToken.startsWith('Bearer '));",
+									"} else {",
+									"    console.log('No token found in environment!');",
+									"}",
+									"console.log('========================');",
+									"",
+									"pm.test(\"Token is stored\", function () {",
+									"    pm.expect(authToken).to.not.be.null;",
+									"    pm.expect(authToken).to.not.be.undefined;",
+									"    pm.expect(authToken.length).to.be.greaterThan(0);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				}
+			],
+			"description": "User Service core endpoints"
+		},
+		{
+			"name": "Order Service",
+			"item": [
+				{
+					"name": "Get All Orders",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{apiGatewayUrl}}/orders-service/api/orders",
+							"host": [
+								"{{apiGatewayUrl}}"
+							],
+							"path": [
+								"orders-service",
+								"api",
+								"orders"
+							]
+						},
+						"description": "Get all orders (requires authentication)"
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Debug: Check if token is being used",
+									"const authToken = pm.environment.get('authToken');",
+									"console.log('Get All Orders - Using authToken:', authToken ? 'Yes' : 'No');",
+									"if (authToken) {",
+									"    console.log('Token preview:', authToken.substring(0, 50) + '...');",
+									"}",
+									"",
+									"pm.test(\"Status code is 200 or 401\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 401]);",
+									"});",
+									"",
+									"pm.test(\"If successful, response is an array\", function () {",
+									"    if (pm.response.code === 200) {",
+									"        const responseJson = pm.response.json();",
+									"        pm.expect(responseJson).to.be.an('array');",
+									"    }",
+									"});",
+									"",
+									"pm.test(\"Orders have required fields\", function () {",
+									"    if (pm.response.code === 200) {",
+									"        const responseJson = pm.response.json();",
+									"        if (responseJson.length > 0) {",
+									"            const order = responseJson[0];",
+									"            pm.expect(order).to.have.property('orderId');",
+									"            pm.expect(order).to.have.property('userId');",
+									"            pm.expect(order).to.have.property('status');",
+									"            pm.expect(order).to.have.property('totalAmount');",
+									"        }",
+									"    }",
+									"});",
+									"",
+									"// Debug: Log response details",
+									"console.log('Get All Orders response status:', pm.response.code);",
+									"if (pm.response.code === 401) {",
+									"    console.log('Unauthorized - check if token is valid or being sent');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Order by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{apiGatewayUrl}}/orders-service/api/orders/1",
+							"host": [
+								"{{apiGatewayUrl}}"
+							],
+							"path": [
+								"orders-service",
+								"api",
+								"orders",
+								"1"
+							]
+						},
+						"description": "Get specific order by ID (using ID 1 from seed data)"
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200, 401, or 404\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 401, 404]);",
+									"});",
+									"",
+									"pm.test(\"If order exists, has required fields\", function () {",
+									"    if (pm.response.code === 200) {",
+									"        const order = pm.response.json();",
+									"        pm.expect(order).to.have.property('orderId');",
+									"        pm.expect(order).to.have.property('userId');",
+									"        pm.expect(order).to.have.property('status');",
+									"        pm.expect(order).to.have.property('totalAmount');",
+									"        pm.expect(order.orderId).to.eql(1);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "Create Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": 1,\n  \"items\": [\n    {\n      \"noodleId\": 1,\n      \"quantity\": 2\n    },\n    {\n      \"noodleId\": 2,\n      \"quantity\": 1\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{apiGatewayUrl}}/orders-service/api/orders",
+							"host": [
+								"{{apiGatewayUrl}}"
+							],
+							"path": [
+								"orders-service",
+								"api",
+								"orders"
+							]
+						},
+						"description": "Create a new order with multiple items"
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201, 400, or 401\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([201, 400, 401]);",
+									"});",
+									"",
+									"pm.test(\"If created successfully, has required fields\", function () {",
+									"    if (pm.response.code === 201) {",
+									"        const order = pm.response.json();",
+									"        pm.expect(order).to.have.property('orderId');",
+									"        pm.expect(order).to.have.property('userId');",
+									"        pm.expect(order).to.have.property('status');",
+									"        pm.expect(order).to.have.property('totalAmount');",
+									"        pm.expect(order.userId).to.eql(1);",
+									"        pm.expect(order.status).to.eql('Pending');",
+									"        ",
+									"        // Store order ID for payment tests",
+									"        pm.environment.set('lastOrderId', order.orderId);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				}
+			],
+			"description": "Order Service core endpoints"
+		},
+		{
+			"name": "Payment Service",
+			"item": [
+				{
+					"name": "Get All Payments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{apiGatewayUrl}}/payments-service/api/payments",
+							"host": [
+								"{{apiGatewayUrl}}"
+							],
+							"path": [
+								"payments-service",
+								"api",
+								"payments"
+							]
+						},
+						"description": "Get all payments (requires authentication)"
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 or 401\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 401]);",
+									"});",
+									"",
+									"pm.test(\"If successful, response is an array\", function () {",
+									"    if (pm.response.code === 200) {",
+									"        const responseJson = pm.response.json();",
+									"        pm.expect(responseJson).to.be.an('array');",
+									"    }",
+									"});",
+									"",
+									"pm.test(\"Payments have required fields\", function () {",
+									"    if (pm.response.code === 200) {",
+									"        const responseJson = pm.response.json();",
+									"        if (responseJson.length > 0) {",
+									"            const payment = responseJson[0];",
+									"            pm.expect(payment).to.have.property('paymentId');",
+									"            pm.expect(payment).to.have.property('orderId');",
+									"            pm.expect(payment).to.have.property('amount');",
+									"            pm.expect(payment).to.have.property('status');",
+									"        }",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Payment by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{apiGatewayUrl}}/payments-service/api/payments/1",
+							"host": [
+								"{{apiGatewayUrl}}"
+							],
+							"path": [
+								"payments-service",
+								"api",
+								"payments",
+								"1"
+							]
+						},
+						"description": "Get specific payment by ID (using ID 1 from seed data)"
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200, 401, or 404\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 401, 404]);",
+									"});",
+									"",
+									"pm.test(\"If payment exists, has required fields\", function () {",
+									"    if (pm.response.code === 200) {",
+									"        const payment = pm.response.json();",
+									"        pm.expect(payment).to.have.property('paymentId');",
+									"        pm.expect(payment).to.have.property('orderId');",
+									"        pm.expect(payment).to.have.property('amount');",
+									"        pm.expect(payment).to.have.property('status');",
+									"        pm.expect(payment.paymentId).to.eql(1);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "Create Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"orderId\": {{lastOrderId}},\n  \"amount\": 25.99,\n  \"status\": \"Pending\",\n  \"paymentMethod\": \"Credit Card\",\n  \"transactionId\": \"txn_123456789\"\n}"
+						},
+						"url": {
+							"raw": "{{apiGatewayUrl}}/payments-service/api/payments",
+							"host": [
+								"{{apiGatewayUrl}}"
+							],
+							"path": [
+								"payments-service",
+								"api",
+								"payments"
+							]
+						},
+						"description": "Create a new payment for an order"
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201, 400, or 401\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([201, 400, 401]);",
+									"});",
+									"",
+									"pm.test(\"If created successfully, has required fields\", function () {",
+									"    if (pm.response.code === 201) {",
+									"        const payment = pm.response.json();",
+									"        pm.expect(payment).to.have.property('paymentId');",
+									"        pm.expect(payment).to.have.property('orderId');",
+									"        pm.expect(payment).to.have.property('amount');",
+									"        pm.expect(payment).to.have.property('status');",
+									"        pm.expect(payment.amount).to.eql(25.99);",
+									"        pm.expect(payment.status).to.eql('Pending');",
+									"        ",
+									"        // Store payment ID for confirmation test",
+									"        pm.environment.set('lastPaymentId', payment.paymentId);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "Confirm Payment",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"Completed\"\n}"
+						},
+						"url": {
+							"raw": "{{apiGatewayUrl}}/payments-service/api/payments/{{lastPaymentId}}/status",
+							"host": [
+								"{{apiGatewayUrl}}"
+							],
+							"path": [
+								"payments-service",
+								"api",
+								"payments",
+								"{{lastPaymentId}}",
+								"status"
+							]
+						},
+						"description": "Confirm/complete a payment by updating its status"
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200, 401, or 404\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 401, 404]);",
+									"});",
+									"",
+									"pm.test(\"If updated successfully, has required fields\", function () {",
+									"    if (pm.response.code === 200) {",
+									"        const response = pm.response.json();",
+									"        pm.expect(response).to.have.property('message');",
+									"        pm.expect(response).to.have.property('paymentId');",
+									"        pm.expect(response).to.have.property('newStatus');",
+									"        pm.expect(response.newStatus).to.eql('Completed');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				}
+			],
+			"description": "Payment Service core endpoints"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "apiGatewayUrl",
+			"value": "https://localhost:7282",
+			"type": "string"
+		}
+	]
+} 

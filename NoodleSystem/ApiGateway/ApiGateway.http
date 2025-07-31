@@ -8,6 +8,15 @@ Accept: application/json
 GET {{ApiGateway_HostAddress}}/users-service/api/users
 Accept: application/json
 
+### Test User Login
+POST {{ApiGateway_HostAddress}}/users-service/api/users/login
+Content-Type: application/json
+
+{
+  "email": "john.doe@email.com",
+  "password": "hashedpassword123"
+}
+
 ### Test Order Service Route
 GET {{ApiGateway_HostAddress}}/orders-service/api/orders
 Accept: application/json
