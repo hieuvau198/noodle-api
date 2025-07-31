@@ -1,6 +1,20 @@
-@ApiGateway_HostAddress = http://localhost:5049
+@ApiGateway_HostAddress = https://localhost:7282
 
-GET {{ApiGateway_HostAddress}}/weatherforecast/
+### Health Check - API Gateway
+GET {{ApiGateway_HostAddress}}/health
 Accept: application/json
 
-###
+### Test User Service Route
+GET {{ApiGateway_HostAddress}}/users-service/api/users
+Accept: application/json
+
+### Test Order Service Route
+GET {{ApiGateway_HostAddress}}/orders-service/api/orders
+Accept: application/json
+
+### Test Payment Service Route
+GET {{ApiGateway_HostAddress}}/payments-service/api/payments
+Accept: application/json
+
+### Swagger UI
+GET {{ApiGateway_HostAddress}}/swagger
